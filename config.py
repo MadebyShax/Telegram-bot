@@ -25,11 +25,13 @@ class Settings(BaseSettings):
     CARDS_PER_PACKAGE: int = 5
     FREE_TRIAL_CREDITS: int = 1
 
-    # AI Vision & LLM (OpenAI GPT-4o or Gemini)
-    OPENAI_API_KEY: Optional[str] = None
-    OPENAI_MODEL: str = "gpt-4o"
+    # Google AI Studio API (Gemini Vision & Card Generation)
+    # Get your free/paid key from: https://aistudio.google.com/app/apikey
+    GEMINI_API_KEY: Optional[str] = None
+    GEMINI_MODEL: str = "gemini-2.5-flash"
 
-    # AI Image Generation (Flux.1 on Replicate or Fal.ai)
+    # Optional alternative AI Vision & Image services
+    OPENAI_API_KEY: Optional[str] = None
     REPLICATE_API_TOKEN: Optional[str] = None
     FLUX_MODEL_VERSION: str = "black-forest-labs/flux-schnell"
 

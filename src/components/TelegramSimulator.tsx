@@ -11,12 +11,18 @@ import {
   Layers,
   ArrowRight,
   RefreshCw,
-  Eye
+  Eye,
+  X,
+  FileText,
+  Phone,
+  Presentation,
+  LayoutGrid
 } from 'lucide-react';
 import { SAMPLE_PRODUCTS, SampleProductItem } from '../data/sampleProducts';
 import { TelegramMessage, StudioCard, ProductMetadata } from '../types';
 import { PaymentModal } from './PaymentModal';
 import { StudioCardViewer } from './StudioCardViewer';
+import { TRANSLATIONS, Language } from '../data/translations';
 
 interface TelegramSimulatorProps {
   userCredits: number;
@@ -24,6 +30,7 @@ interface TelegramSimulatorProps {
   onOpenMarketplace: (productData: ProductMetadata, cards: StudioCard[]) => void;
   onTransactionLogged: (amountUzs: number, provider: 'CLICK' | 'PAYME') => void;
   onGenerationLogged: (productName: string, cardsCount: number) => void;
+  language: Language;
 }
 
 export const TelegramSimulator: React.FC<TelegramSimulatorProps> = ({
@@ -32,14 +39,26 @@ export const TelegramSimulator: React.FC<TelegramSimulatorProps> = ({
   onOpenMarketplace,
   onTransactionLogged,
   onGenerationLogged,
+  language,
 }) => {
+  const t = TRANSLATIONS[language];
+  const [isPhoneVerified, setIsPhoneVerified] = useState(false);
+  const [generationMode, setGenerationMode] = useState<'cards' | 'presentation'>('cards');
+  const [seoRequestedMessageIds, setSeoRequestedMessageIds] = useState<Set<string>>(new Set());
+  const [seoDeclinedMessageIds, setSeoDeclinedMessageIds] = useState<Set<string>>(new Set());
+
   const [messages, setMessages] = useState<TelegramMessage[]>([
     {
       id: 'welcome-1',
       sender: 'bot',
       timestamp: '09:00',
       type: 'text',
-      text: `Assalomu alaykum! ⚡️ <b>Zero-Prompt E-Commerce AI Botiga xush kelibsiz!</b>\n\nSizdan hech qanday murakkab prompt yoki matn talab qilinmaydi:\n📸 <b>Shunchaki mahsulotingiz rasmini yuboring!</b>\n\nBot avtomatik tarzda:\n1️⃣ Mahsulot turi, rangi, materiali va shaklini aniqlaydi (Vision AI)\n2️⃣ Fonni olib tashlab, <b>5 xil premium studiya kartochkasi</b> yaratadi (Flux AI)\n3️⃣ <b>Uzum Market va Wildberries</b> uchun o'zbek va rus tillarida SEO sarlavha va tavsif tuzadi.\n\n🎁 <i>Yangi foydalanuvchilar uchun 1 ta bepul paket taqdim etildi!</i>\n\nQuyidagi namunalardan birini tanlang yoki o'z mahsulot rasmingizni yuboring:`,
+      text:
+        language === 'ru'
+          ? `Здравствуйте! ⚡️ <b>Добро пожаловать в E-Commerce AI Бот!</b>\n<i>Интеграция с Google AI Studio (Gemini)</i>\n\nНикаких сложных промптов писать не нужно:\n📸 <b>Просто отправьте фото товара!</b>\n\nБот через Google AI Studio автоматически:\n1️⃣ Определит категорию, цвет, материал и форму (Gemini Vision)\n2️⃣ Удалит фон и сгенерирует <b>5 профессиональных карточек товара</b> для маркетплейсов\n3️⃣ Составит продающее SEO описание для Uzum Market и Wildberries.\n\n🎁 <b>Бонус:</b> Нажмите кнопку ниже и подтвердите номер телефона, чтобы получить <b>+1 бесплатный пакет (5 карточек)</b>!`
+          : language === 'en'
+          ? `Welcome! ⚡️ <b>Welcome to E-Commerce AI Bot!</b>\n<i>Powered by Google AI Studio (Gemini API)</i>\n\nNo complex prompts required:\n📸 <b>Simply send a raw product photo!</b>\n\nThe bot via Google AI Studio automatically:\n1️⃣ Detects product type, color, material, and shape (Gemini Vision)\n2️⃣ Removes background & generates <b>5 professional e-commerce product cards</b>\n3️⃣ Crafts high-CTR marketplace SEO copy for Uzum & Wildberries.\n\n🎁 <b>Welcome Bonus:</b> Share your phone number below to get <b>+1 free pack (5 cards)</b>!`
+          : `Assalomu alaykum! ⚡️ <b>Zero-Prompt E-Commerce AI Botiga xush kelibsiz!</b>\n<i>Google AI Studio (Gemini) integratsiyasi bilan ishlaydi</i>\n\nSizdan hech qanday murakkab prompt yoki matn talab qilinmaydi:\n📸 <b>Shunchaki mahsulotingiz rasmini yuboring!</b>\n\nBot Google AI Studio orqali avtomatik tarzda:\n1️⃣ Mahsulot turi, rangi, materiali va shaklini aniqlaydi (Gemini Vision)\n2️⃣ Fonni tozalab, <b>5 ta professional e-commerce tovar kartochkasi</b> tayyorlaydi\n3️⃣ <b>Uzum va Wildberries</b> uchun o'zbek va rus tillarida tayyor SEO tavsif tuzadi.\n\n🎁 <b>Xush kelibsiz bonusi:</b> Pastdagi tugmani bosing va telefon raqamingizni tasdiqlab <b>1 ta bepul paket</b> oling!`,
     },
   ]);
 
@@ -193,8 +212,14 @@ export const TelegramSimulator: React.FC<TelegramSimulatorProps> = ({
                 progressStep: {
                   current: 3,
                   total: 3,
-                  title: '3/3: 5 xil studiya kartochkalari yaratilmoqda...',
-                  subtitle: 'Flux AI fonni tozalab, 5 ta professional e-commerce interyeriga joylashtirmoqda...',
+                  title:
+                    generationMode === 'presentation'
+                      ? '3/3: NotebookLM uslubida 5 ta taqdimot slaydi tayyorlanmoqda...'
+                      : '3/3: 5 xil studiya kartochkalari yaratilmoqda...',
+                  subtitle:
+                    generationMode === 'presentation'
+                      ? 'Vizual Pitch Deck slaydlari (16:9) avtomatik sintezlanmoqda...'
+                      : 'Flux AI fonni tozalab, 5 ta professional e-commerce interyeriga joylashtirmoqda...',
                 },
               }
             : m
@@ -205,10 +230,93 @@ export const TelegramSimulator: React.FC<TelegramSimulatorProps> = ({
 
       // Step 4: Final delivery!
       let cards: StudioCard[];
-      if ('studioCards' in productData) {
-        cards = productData.studioCards as StudioCard[];
+      if (generationMode === 'presentation') {
+        const baseImg = 'studioCards' in productData ? productData.studioCards[0].imageUrl : SAMPLE_PRODUCTS[0].studioCards[0].imageUrl;
+        cards = [
+          {
+            id: `slide-1-${Date.now()}`,
+            index: 1,
+            styleName: '1. Titul va Brend Qopqog\'i (Cover)',
+            badge: 'SLIDE 1 · COVER',
+            imageUrl: baseImg,
+            aspectRatio: '16:9',
+            description: `Titul slaydi: ${metadata.product_name_uz} — Uzum va Wildberries uchun to'liq taqdimot.`
+          },
+          {
+            id: `slide-2-${Date.now()}`,
+            index: 2,
+            styleName: '2. Mijoz Uchun Muammo va Yechim',
+            badge: 'SLIDE 2 · VALUE PROP',
+            imageUrl: 'studioCards' in productData ? productData.studioCards[1].imageUrl : SAMPLE_PRODUCTS[0].studioCards[1].imageUrl,
+            aspectRatio: '16:9',
+            description: 'Afzalliklar va mijoz ehtiyojini qondiruvchi asosiy omillar.'
+          },
+          {
+            id: `slide-3-${Date.now()}`,
+            index: 3,
+            styleName: '3. Texnik Xususiyatlar va Materiallar',
+            badge: 'SLIDE 3 · SPECS',
+            imageUrl: 'studioCards' in productData ? productData.studioCards[2].imageUrl : SAMPLE_PRODUCTS[0].studioCards[2].imageUrl,
+            aspectRatio: '16:9',
+            description: 'Xususiyatlar: o\'lchamlar, material tarkibi va ishlab chiqarish standarti.'
+          },
+          {
+            id: `slide-4-${Date.now()}`,
+            index: 4,
+            styleName: '4. Bozor Iqtisodiyoti va Marja Tahlili',
+            badge: 'SLIDE 4 · ECONOMICS',
+            imageUrl: 'studioCards' in productData ? productData.studioCards[3].imageUrl : SAMPLE_PRODUCTS[0].studioCards[3].imageUrl,
+            aspectRatio: '16:9',
+            description: 'Bozor narxi, Uzum Nasiya to\'lovlari va daromad marjasi tahlili.'
+          },
+          {
+            id: `slide-5-${Date.now()}`,
+            index: 5,
+            styleName: '5. Ulgurji Buyurtma va Yetkazib Berish',
+            badge: 'SLIDE 5 · CTA',
+            imageUrl: 'studioCards' in productData ? productData.studioCards[4].imageUrl : SAMPLE_PRODUCTS[0].studioCards[4].imageUrl,
+            aspectRatio: '16:9',
+            description: 'B2B ta\'minot shartlari va 1 kunda yetkazib berish kafolati.'
+          }
+        ];
       } else {
-        cards = SAMPLE_PRODUCTS[0].studioCards as StudioCard[];
+        const STYLE_VARIATIONS = [
+          { name: "Minimalist Travertin Tosh Poydevor (Hero)", badge: "UZUM TOP SOTUV", desc: "Yumshoq ertalabki quyosh nuri, tabiiy travertin g'ovak tosh poydevor." },
+          { name: "Skandinav Shinam Yog'och Dasturxon", badge: "100% KAFOLAT", desc: "Tabiiy eman yuzasi, zig'ir mato va iliq xonadon nuri." },
+          { name: "Obsidian Qorong'u Lyuks Vitrina", badge: "PREMIUM SIFAT", desc: "Qora yaltiroq obsidian marmar, moviy rim-yorug'lik va neon kontur." },
+          { name: "Zamonaviy Pastel Infografika Maydoni", badge: "1 KUNDA YETKAZISH", desc: "Silliq pista pastel poydevor, infografika matnlari uchun toza fon." },
+          { name: "Makro Tekstura va Sifat Fokusi", badge: "TOP SIFAT", desc: "Material to'qimasi, nozik qirralar va mahsulot sifati fokusi." },
+          { name: "Sahroyi Oltin Qum & Quyosh Nuri", badge: "TABIIY MAHSULOT", desc: "Golden Hour oltin nurlari va to'lqinli mayin qum." },
+          { name: "Industrial Beton & Metall Loft", badge: "ZAMONAVIY USLUB", desc: "Silliqlangan kulrang beton va minimalist zamonaviy karkas." },
+          { name: "Suzuvchi Geometrik Podestlar", badge: "YANGI TREND", desc: "Havoda suzuvchi podiumlar, dinamik izometrik e-commerce rakurs." },
+          { name: "Organik Botanika va Yashillik", badge: "EKOLOGIK TOZA", desc: "Yashil mox, tabiiy barglar va shaffof shudring tomchilari." },
+          { name: "Glossy Suv Sathi & Shudring", badge: "ENG SOTILGAN", desc: "Toza suv to'lqini va akslanish, tetiklantiruvchi yorqin fon." },
+          { name: "Ipak Mato va Nafis Draperiya", badge: "ORIGINAL", desc: "Krem rangli yengil ipak to'lqinlari va mayin studiya soyalari." },
+          { name: "Neo-Kiber Studiya Vitrinasi", badge: "XIT MAHSULOT", desc: "Futuristik kontrast va professional vitrina estetikasi." }
+        ];
+
+        // Shuffle styles so every generation is fresh and varied
+        const shuffled = [...STYLE_VARIATIONS].sort(() => Math.random() - 0.5).slice(0, 5);
+
+        const availableImages = 'studioCards' in productData
+          ? (productData.studioCards as StudioCard[]).map((c) => c.imageUrl)
+          : [
+              productData.imageUrl,
+              productData.imageUrl,
+              productData.imageUrl,
+              productData.imageUrl,
+              productData.imageUrl
+            ];
+
+        cards = shuffled.map((style, idx) => ({
+          id: `card-${Date.now()}-${idx + 1}-${Math.floor(Math.random() * 1000)}`,
+          index: idx + 1,
+          styleName: style.name,
+          badge: style.badge,
+          imageUrl: availableImages[idx % availableImages.length],
+          aspectRatio: '3:4',
+          description: style.desc,
+        }));
       }
 
       // Remove progress message and append media group + SEO text
@@ -235,6 +343,41 @@ export const TelegramSimulator: React.FC<TelegramSimulatorProps> = ({
     }
   };
 
+  const handleSharePhoneContact = () => {
+    if (isPhoneVerified) return;
+    setIsPhoneVerified(true);
+    setUserCredits((prev) => prev + 1);
+
+    const userContactMsg: TelegramMessage = {
+      id: `contact-${Date.now()}`,
+      sender: 'user',
+      timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+      type: 'text',
+      text: `📱 <b>+998 90 849 20 19</b>\n<i>(${
+        language === 'ru'
+          ? 'Контакт Telegram отправлен'
+          : language === 'en'
+          ? 'Telegram Contact Shared'
+          : 'Telegram Kontakt ulashildi'
+      })</i>`,
+    };
+
+    const botBonusMsg: TelegramMessage = {
+      id: `bonus-${Date.now()}`,
+      sender: 'bot',
+      timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+      type: 'text',
+      text:
+        language === 'ru'
+          ? `🎉 <b>Поздравляем! Ваш номер успешно подтвержден.</b>\n\n🎁 <b>Бонус:</b> <b>+1 бесплатный пакет (5 карточек + SEO)</b> зачислен на ваш баланс!\n\n📸 Теперь выберите любой пример ниже или отправьте фото вашего товара!`
+          : language === 'en'
+          ? `🎉 <b>Congratulations! Phone number verified.</b>\n\n🎁 <b>Bonus:</b> <b>+1 Free Package (5 studio cards + SEO)</b> added to your account!\n\n📸 Now select a sample below or upload your product photo!`
+          : `🎉 <b>Tabriklaymiz! Telefon raqamingiz muvaffaqiyatli tasdiqlandi.</b>\n\n🎁 <b>Xush kelibsiz bonusi:</b> <b>+1 ta bepul paket (5 ta studiya kartochkasi + SEO)</b> hisobingizga qo'shildi!\n\n📸 Endi quyidagi namunalardan birini bosing yoki o'z mahsulot rasmingizni yuboring!`,
+    };
+
+    setMessages((prev) => [...prev, userContactMsg, botBonusMsg]);
+  };
+
   const handleCustomFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -254,21 +397,46 @@ export const TelegramSimulator: React.FC<TelegramSimulatorProps> = ({
 
   return (
     <div className="flex flex-col h-[calc(100vh-65px)] bg-[#0b0f17]">
-      {/* Sample Products Picker Bar */}
-      <div className="bg-[#111827] border-b border-slate-800 px-6 py-3 shrink-0">
+      {/* Sample Products & Mode Picker Bar */}
+      <div className="bg-[#111827] border-b border-slate-800 px-6 py-2.5 shrink-0">
         <div className="max-w-5xl mx-auto flex flex-wrap items-center justify-between gap-3">
-          <div className="flex items-center gap-2 text-xs text-slate-300">
-            <span className="font-semibold text-white">Zero-Prompt Test:</span>
-            <span className="text-slate-400">1 marta bosish orqali haqiqiy e-commerce namunalarini sinab ko'ring:</span>
+          {/* Mode Switcher (Uzum Cards 3:4 vs NotebookLM Presentation Slides 16:9) */}
+          <div className="flex items-center gap-2">
+            <span className="text-[11px] font-semibold text-slate-400">{t.modeSelector}</span>
+            <div className="flex bg-slate-900 border border-slate-700/80 rounded-lg p-0.5 text-xs font-semibold">
+              <button
+                onClick={() => setGenerationMode('cards')}
+                className={`flex items-center gap-1.5 px-3 py-1 rounded-md transition-colors ${
+                  generationMode === 'cards'
+                    ? 'bg-indigo-600 text-white shadow-sm'
+                    : 'text-slate-400 hover:text-white'
+                }`}
+              >
+                <LayoutGrid className="w-3.5 h-3.5" />
+                <span>{t.modeCards}</span>
+              </button>
+              <button
+                onClick={() => setGenerationMode('presentation')}
+                className={`flex items-center gap-1.5 px-3 py-1 rounded-md transition-colors ${
+                  generationMode === 'presentation'
+                    ? 'bg-indigo-600 text-white shadow-sm'
+                    : 'text-slate-400 hover:text-white'
+                }`}
+              >
+                <Presentation className="w-3.5 h-3.5" />
+                <span>{t.modePresentation}</span>
+              </button>
+            </div>
           </div>
 
+          {/* Sample Products & Upload */}
           <div className="flex items-center gap-2 overflow-x-auto pb-1 sm:pb-0">
             {SAMPLE_PRODUCTS.map((prod) => (
               <button
                 key={prod.id}
                 onClick={() => processZeroPromptUpload(prod)}
                 disabled={isProcessing}
-                className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 active:bg-slate-600 border border-slate-700/80 text-xs font-medium text-slate-200 hover:text-white transition-all disabled:opacity-50 whitespace-nowrap"
+                className="flex items-center gap-2 px-3 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 active:bg-slate-600 border border-slate-700/80 text-xs font-medium text-slate-200 hover:text-white transition-all disabled:opacity-50 whitespace-nowrap"
               >
                 <img
                   src={prod.imageUrl}
@@ -283,10 +451,10 @@ export const TelegramSimulator: React.FC<TelegramSimulatorProps> = ({
             <button
               onClick={() => fileInputRef.current?.click()}
               disabled={isProcessing}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-indigo-600/20 hover:bg-indigo-600/30 border border-indigo-500/40 text-xs font-semibold text-indigo-300 hover:text-indigo-200 transition-all disabled:opacity-50 whitespace-nowrap"
+              className="flex items-center gap-1.5 px-3 py-1 rounded-lg bg-indigo-600/20 hover:bg-indigo-600/30 border border-indigo-500/40 text-xs font-semibold text-indigo-300 hover:text-indigo-200 transition-all disabled:opacity-50 whitespace-nowrap"
             >
               <ImageIcon className="w-3.5 h-3.5" />
-              <span>O'z rasmingizni yuklash</span>
+              <span>{t.uploadCustom}</span>
             </button>
             <input
               type="file"
@@ -314,8 +482,10 @@ export const TelegramSimulator: React.FC<TelegramSimulatorProps> = ({
                   BOT
                 </span>
               </div>
-              <div className="text-xs text-slate-400">
-                Uzum Market & Wildberries Studio Generator
+              <div className="text-xs text-slate-400 flex items-center gap-1.5">
+                <span>Uzum & Wildberries</span>
+                <span className="text-slate-600">·</span>
+                <span className="text-indigo-400 font-semibold">Google AI Studio</span>
               </div>
             </div>
           </div>
@@ -447,113 +617,188 @@ export const TelegramSimulator: React.FC<TelegramSimulatorProps> = ({
                       ))}
                     </div>
 
-                    {/* Formatted SEO Content */}
-                    <div className="rounded-xl bg-slate-900/90 border border-slate-700/70 p-4 space-y-4 text-xs">
-                      {/* Uzum Uzbek Section */}
-                      <div className="space-y-2">
-                        <div className="flex items-center justify-between">
-                          <span className="font-bold text-indigo-400 flex items-center gap-1.5">
-                            🟣 UZUM MARKET (O'zbekcha)
+                    {/* Step: Ask if SEO text is needed or not before displaying */}
+                    {!seoRequestedMessageIds.has(msg.id) && !seoDeclinedMessageIds.has(msg.id) && (
+                      <div className="rounded-xl bg-slate-900 border border-indigo-500/30 p-4 space-y-3">
+                        <div className="flex items-center gap-2 text-indigo-300 font-semibold text-xs">
+                          <FileText className="w-4 h-4 text-indigo-400 shrink-0" />
+                          <span>
+                            {language === 'ru'
+                              ? '📝 Отправить SEO описание (заголовок, буллет-поинты, теги) для Uzum и Wildberries?'
+                              : language === 'en'
+                              ? '📝 Do you need marketplace SEO copy (titles, bullet points, tags) for Uzum & Wildberries?'
+                              : "📝 Uzum Market va Wildberries uchun SEO matn (sarlavha, afzalliklar va teglar) kerakmi?"}
                           </span>
+                        </div>
+                        <div className="flex gap-2">
                           <button
-                            onClick={() =>
-                              copyToClipboard(
-                                `${msg.productMetadata?.uzum_title_uz}\n\n` +
-                                  msg.productMetadata?.bullet_points_uz.join('\n') +
-                                  `\n\n` +
-                                  msg.productMetadata?.seo_tags_uz.join(' '),
-                                'uzum-uz'
-                              )
-                            }
-                            className="text-[11px] font-medium text-slate-400 hover:text-white flex items-center gap-1"
+                            onClick={() => setSeoRequestedMessageIds((prev) => new Set(prev).add(msg.id))}
+                            className="flex-1 py-2 px-3 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs flex items-center justify-center gap-1.5 transition-colors shadow"
                           >
-                            {copiedKey === 'uzum-uz' ? (
-                              <Check className="w-3 h-3 text-emerald-400" />
-                            ) : (
-                              <Copy className="w-3 h-3" />
-                            )}
-                            {copiedKey === 'uzum-uz' ? 'Nusxalandi' : 'Hammasini nusxalash'}
+                            <Check className="w-3.5 h-3.5" />
+                            <span>
+                              {language === 'ru'
+                                ? '✅ Да, отправить SEO'
+                                : language === 'en'
+                                ? '✅ Yes, send SEO'
+                                : '✅ Ha, SEO matn kerak'}
+                            </span>
+                          </button>
+                          <button
+                            onClick={() => setSeoDeclinedMessageIds((prev) => new Set(prev).add(msg.id))}
+                            className="py-2 px-3 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-semibold flex items-center justify-center gap-1.5 transition-colors border border-slate-700"
+                          >
+                            <X className="w-3.5 h-3.5" />
+                            <span>
+                              {language === 'ru'
+                                ? '❌ Нет, только фото'
+                                : language === 'en'
+                                ? '❌ No, cards only'
+                                : "❌ Yo'q, faqat kartochkalar"}
+                            </span>
                           </button>
                         </div>
-
-                        <div className="p-2.5 rounded-lg bg-slate-950/70 border border-slate-800 text-slate-200">
-                          <span className="text-[11px] text-slate-400 block font-medium mb-1">
-                            SEO Sarlavha:
-                          </span>
-                          <p className="font-medium text-slate-100">{msg.productMetadata.uzum_title_uz}</p>
-                        </div>
-
-                        <div className="space-y-1 text-slate-300">
-                          <span className="text-[11px] text-slate-400 font-medium block">
-                            Afzalliklari (Bullet points):
-                          </span>
-                          {msg.productMetadata.bullet_points_uz.map((bullet, idx) => (
-                            <div key={idx} className="leading-snug">
-                              {bullet}
-                            </div>
-                          ))}
-                        </div>
-
-                        <div className="text-[11px] text-slate-400">
-                          <span className="font-medium text-slate-300">Teglar: </span>
-                          {msg.productMetadata.seo_tags_uz.join(' ')}
-                        </div>
                       </div>
+                    )}
 
-                      <div className="border-t border-slate-800 pt-3 space-y-2">
-                        {/* Uzum & Wildberries Russian Section */}
-                        <div className="flex items-center justify-between">
-                          <span className="font-bold text-violet-400 flex items-center gap-1.5">
-                            🟣 UZUM & WILDBERRIES (Русский)
+                    {/* If declined: Show friendly acknowledgment with re-open toggle */}
+                    {seoDeclinedMessageIds.has(msg.id) && (
+                      <div className="rounded-xl bg-slate-900/60 border border-slate-800 p-3 text-xs text-slate-400 flex items-center justify-between">
+                        <span className="flex items-center gap-1.5">
+                          <span>👌</span>
+                          <span>
+                            {language === 'ru'
+                              ? 'Понятно! Сохранены только 5 студийных карточек.'
+                              : language === 'en'
+                              ? 'Understood! Only the 5 studio cards are saved.'
+                              : "Tushunarli! Faqat 5 ta studiya kartochkasi saqlandi."}
                           </span>
-                          <button
-                            onClick={() =>
-                              copyToClipboard(
-                                `${msg.productMetadata?.uzum_title_ru}\n\n` +
-                                  msg.productMetadata?.bullet_points_ru.join('\n') +
-                                  `\n\n` +
-                                  msg.productMetadata?.seo_tags_ru.join(' '),
-                                'uzum-ru'
-                              )
-                            }
-                            className="text-[11px] font-medium text-slate-400 hover:text-white flex items-center gap-1"
-                          >
-                            {copiedKey === 'uzum-ru' ? (
-                              <Check className="w-3 h-3 text-emerald-400" />
-                            ) : (
-                              <Copy className="w-3 h-3" />
-                            )}
-                            {copiedKey === 'uzum-ru' ? 'Скопировано' : 'Скопировать все'}
-                          </button>
-                        </div>
-
-                        <div className="p-2.5 rounded-lg bg-slate-950/70 border border-slate-800 text-slate-200">
-                          <span className="text-[11px] text-slate-400 block font-medium mb-1">
-                            Название для карточки:
-                          </span>
-                          <p className="font-medium text-slate-100">{msg.productMetadata.uzum_title_ru}</p>
-                        </div>
-
-                        <div className="space-y-1 text-slate-300">
-                          {msg.productMetadata.bullet_points_ru.map((bullet, idx) => (
-                            <div key={idx} className="leading-snug">
-                              {bullet}
-                            </div>
-                          ))}
-                        </div>
-                      </div>
-
-                      {/* Interactive Button to switch to Marketplace Preview */}
-                      <div className="pt-2 flex flex-wrap gap-2">
+                        </span>
                         <button
-                          onClick={() => onOpenMarketplace(msg.productMetadata!, msg.mediaGroup!)}
-                          className="flex items-center gap-1.5 px-3.5 py-2 rounded-lg bg-gradient-to-r from-violet-600 to-indigo-600 hover:from-violet-500 hover:to-indigo-500 text-white font-bold text-xs shadow-md transition-all"
+                          onClick={() => {
+                            setSeoDeclinedMessageIds((prev) => {
+                              const next = new Set(prev);
+                              next.delete(msg.id);
+                              return next;
+                            });
+                            setSeoRequestedMessageIds((prev) => new Set(prev).add(msg.id));
+                          }}
+                          className="text-[11px] text-indigo-400 hover:text-indigo-300 underline font-medium"
                         >
-                          <span>Uzum Market va Wildberries vitrinasida ko'rish</span>
-                          <ArrowRight className="w-3.5 h-3.5" />
+                          {language === 'ru' ? 'Показать SEO' : language === 'en' ? 'Show SEO' : "SEO matnni ko'rish"}
                         </button>
                       </div>
-                    </div>
+                    )}
+
+                    {/* Formatted SEO Content (Only shown if user confirmed) */}
+                    {seoRequestedMessageIds.has(msg.id) && (
+                      <div className="rounded-xl bg-slate-900/90 border border-slate-700/70 p-4 space-y-4 text-xs">
+                        {/* Uzum Uzbek Section */}
+                        <div className="space-y-2">
+                          <div className="flex items-center justify-between">
+                            <span className="font-bold text-indigo-400 flex items-center gap-1.5">
+                              🟣 UZUM MARKET (O'zbekcha)
+                            </span>
+                            <button
+                              onClick={() =>
+                                copyToClipboard(
+                                  `${msg.productMetadata?.uzum_title_uz}\n\n` +
+                                    msg.productMetadata?.bullet_points_uz.join('\n') +
+                                    `\n\n` +
+                                    msg.productMetadata?.seo_tags_uz.join(' '),
+                                  'uzum-uz'
+                                )
+                              }
+                              className="text-[11px] font-medium text-slate-400 hover:text-white flex items-center gap-1"
+                            >
+                              {copiedKey === 'uzum-uz' ? (
+                                <Check className="w-3 h-3 text-emerald-400" />
+                              ) : (
+                                <Copy className="w-3 h-3" />
+                              )}
+                              {copiedKey === 'uzum-uz' ? 'Nusxalandi' : 'Hammasini nusxalash'}
+                            </button>
+                          </div>
+
+                          <div className="p-2.5 rounded-lg bg-slate-950/70 border border-slate-800 text-slate-200">
+                            <span className="text-[11px] text-slate-400 block font-medium mb-1">
+                              SEO Sarlavha:
+                            </span>
+                            <p className="font-medium text-slate-100">{msg.productMetadata.uzum_title_uz}</p>
+                          </div>
+
+                          <div className="space-y-1 text-slate-300">
+                            <span className="text-[11px] text-slate-400 font-medium block">
+                              Afzalliklari (Bullet points):
+                            </span>
+                            {msg.productMetadata.bullet_points_uz.map((bullet, idx) => (
+                              <div key={idx} className="leading-snug">
+                                {bullet}
+                              </div>
+                            ))}
+                          </div>
+
+                          <div className="text-[11px] text-slate-400">
+                            <span className="font-medium text-slate-300">Teglar: </span>
+                            {msg.productMetadata.seo_tags_uz.join(' ')}
+                          </div>
+                        </div>
+
+                        <div className="border-t border-slate-800 pt-3 space-y-2">
+                          {/* Uzum & Wildberries Russian Section */}
+                          <div className="flex items-center justify-between">
+                            <span className="font-bold text-violet-400 flex items-center gap-1.5">
+                              🟣 UZUM & WILDBERRIES (Русский)
+                            </span>
+                            <button
+                              onClick={() =>
+                                copyToClipboard(
+                                  `${msg.productMetadata?.uzum_title_ru}\n\n` +
+                                    msg.productMetadata?.bullet_points_ru.join('\n') +
+                                    `\n\n` +
+                                    msg.productMetadata?.seo_tags_ru.join(' '),
+                                  'uzum-ru'
+                                )
+                              }
+                              className="text-[11px] font-medium text-slate-400 hover:text-white flex items-center gap-1"
+                            >
+                              {copiedKey === 'uzum-ru' ? (
+                                <Check className="w-3 h-3 text-emerald-400" />
+                              ) : (
+                                <Copy className="w-3 h-3" />
+                              )}
+                              {copiedKey === 'uzum-ru' ? 'Скопировано' : 'Скопировать все'}
+                            </button>
+                          </div>
+
+                          <div className="p-2.5 rounded-lg bg-slate-950/70 border border-slate-800 text-slate-200">
+                            <span className="text-[11px] text-slate-400 block font-medium mb-1">
+                              Название для карточки:
+                            </span>
+                            <p className="font-medium text-slate-100">{msg.productMetadata.uzum_title_ru}</p>
+                          </div>
+
+                          <div className="space-y-1 text-slate-300">
+                            {msg.productMetadata.bullet_points_ru.map((bullet, idx) => (
+                              <div key={idx} className="leading-snug">
+                                {bullet}
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+
+                        {/* Interactive Button to switch to Marketplace Preview */}
+                        <div className="pt-2 flex flex-wrap gap-2">
+                          <button
+                            onClick={() => onOpenMarketplace(msg.productMetadata!, msg.mediaGroup!)}
+                            className="flex items-center gap-1.5 px-3.5 py-2 rounded-lg bg-gradient-to-r from-violet-600 to-indigo-600 hover:from-violet-500 hover:to-indigo-500 text-white font-bold text-xs shadow-md transition-all"
+                          >
+                            <span>Uzum Market va Wildberries vitrinasida ko'rish</span>
+                            <ArrowRight className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
+                      </div>
+                    )}
                   </div>
                 )}
 
@@ -602,6 +847,41 @@ export const TelegramSimulator: React.FC<TelegramSimulatorProps> = ({
 
           <div ref={messagesEndRef} />
         </div>
+
+        {/* Telegram Contact Share Banner for Free Welcome Bonus */}
+        {!isPhoneVerified && (
+          <div className="bg-gradient-to-r from-emerald-950/70 to-indigo-950/70 border border-emerald-500/40 rounded-xl p-3 shadow-md flex flex-col sm:flex-row items-center justify-between gap-3">
+            <div className="flex items-center gap-2.5">
+              <div className="w-8 h-8 rounded-lg bg-emerald-500/20 text-emerald-400 flex items-center justify-center shrink-0">
+                <Phone className="w-4 h-4" />
+              </div>
+              <div className="text-xs">
+                <span className="font-bold text-white block">
+                  {language === 'ru'
+                    ? '🎁 Зарегистрируйтесь с номером Telegram'
+                    : language === 'en'
+                    ? '🎁 Register with your Telegram phone number'
+                    : '🎁 Telegram raqamingiz bilan ro\'yxatdan o\'ting'}
+                </span>
+                <span className="text-[11px] text-emerald-300">
+                  {language === 'ru'
+                    ? '+1 бесплатный пакет (5 карточек + SEO) в подарок!'
+                    : language === 'en'
+                    ? '+1 Free package (5 cards + SEO) welcome bonus!'
+                    : '+1 ta bepul paket (5 ta kartochka + SEO) bonus oling!'}
+                </span>
+              </div>
+            </div>
+
+            <button
+              onClick={handleSharePhoneContact}
+              className="w-full sm:w-auto px-4 py-2 rounded-lg bg-emerald-600 hover:bg-emerald-500 active:bg-emerald-700 text-white font-bold text-xs shadow transition-all flex items-center justify-center gap-2 whitespace-nowrap"
+            >
+              <Phone className="w-3.5 h-3.5" />
+              <span>{t.phoneBonusButton}</span>
+            </button>
+          </div>
+        )}
 
         {/* Input Bar */}
         <div className="bg-[#151d2f] border border-slate-800 rounded-xl p-3 shadow-lg flex items-center gap-2 shrink-0">

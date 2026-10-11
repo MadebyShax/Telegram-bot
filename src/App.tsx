@@ -73,6 +73,7 @@ export default function App() {
             onOpenMarketplace={handleOpenMarketplace}
             onTransactionLogged={handleTransactionLogged}
             onGenerationLogged={handleGenerationLogged}
+            language={language}
           />
         )}
 

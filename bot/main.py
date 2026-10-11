@@ -13,6 +13,8 @@ from services.vision_service import VisionService
 from services.seo_service import SeoService
 from services.image_gen_service import ImageGenService
 from services.payment_service import PaymentService
+from services.presentation_service import PresentationService
+from services.google_ai_studio_service import GoogleAIStudioService
 
 # Configure logging
 logging.basicConfig(
@@ -34,13 +36,17 @@ class DependencyInjectionMiddleware(BaseMiddleware):
         vision_service: VisionService,
         seo_service: SeoService,
         image_gen_service: ImageGenService,
-        payment_service: PaymentService
+        payment_service: PaymentService,
+        presentation_service: PresentationService,
+        google_ai_service: GoogleAIStudioService
     ):
         super().__init__()
         self.vision_service = vision_service
         self.seo_service = seo_service
         self.image_gen_service = image_gen_service
         self.payment_service = payment_service
+        self.presentation_service = presentation_service
+        self.google_ai_service = google_ai_service
 
     async def __call__(self, handler, event: TelegramObject, data: dict):
         async with AsyncSessionFactory() as session:
@@ -49,6 +55,8 @@ class DependencyInjectionMiddleware(BaseMiddleware):
             data["seo_service"] = self.seo_service
             data["image_gen_service"] = self.image_gen_service
             data["payment_service"] = self.payment_service
+            data["presentation_service"] = self.presentation_service
+            data["google_ai_service"] = self.google_ai_service
             return await handler(event, data)
 
 
@@ -75,13 +83,17 @@ async def main():
     seo_service = SeoService()
     image_gen_service = ImageGenService()
     payment_service = PaymentService(bot=bot)
+    presentation_service = PresentationService()
+    google_ai_service = GoogleAIStudioService()
 
     # Register dependency injection middleware
     middleware = DependencyInjectionMiddleware(
         vision_service=vision_service,
         seo_service=seo_service,
         image_gen_service=image_gen_service,
-        payment_service=payment_service
+        payment_service=payment_service,
+        presentation_service=presentation_service,
+        google_ai_service=google_ai_service
     )
     dp.update.middleware(middleware)
 

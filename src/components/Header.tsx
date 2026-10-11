@@ -89,7 +89,7 @@ export const Header: React.FC<HeaderProps> = ({
 
         {/* Zone 3: Language toggle & Primary Action */}
         <div className="flex items-center gap-3 shrink-0">
-          {/* Language Switcher */}
+          {/* Language Switcher (UZ, RU, EN) */}
           <div className="flex items-center bg-slate-900 border border-slate-700/80 rounded-lg p-0.5 text-xs font-semibold">
             <button
               onClick={() => setLanguage('uz')}
@@ -106,6 +106,14 @@ export const Header: React.FC<HeaderProps> = ({
               }`}
             >
               RU
+            </button>
+            <button
+              onClick={() => setLanguage('en')}
+              className={`px-2 py-1 rounded transition-colors ${
+                language === 'en' ? 'bg-indigo-600 text-white' : 'text-slate-400 hover:text-white'
+              }`}
+            >
+              EN
             </button>
           </div>
 

@@ -11,11 +11,12 @@ CLICK_PROVIDER_TOKEN="398061629:TEST:999999"
 # Payme provider token (from @BotFather -> Payments -> Payme)
 PAYME_PROVIDER_TOKEN="371317599:TEST:999999"
 
-# AI Vision Analysis (OpenAI GPT-4o)
-OPENAI_API_KEY="sk-proj-xxxxxxxxxxxxxxxxxxxx"
-OPENAI_MODEL="gpt-4o"
+# Google AI Studio API Key (Get your key from https://aistudio.google.com/app/apikey)
+GEMINI_API_KEY="AIzaSyYourGoogleAIStudioKeyHere"
+GEMINI_MODEL="gemini-2.5-flash"
 
-# AI Studio Image Generation (Flux.1 Schnell via Replicate or Fal.ai)
+# Optional alternative AI keys (if using OpenAI / Replicate)
+OPENAI_API_KEY="sk-proj-xxxxxxxxxxxxxxxxxxxx"
 REPLICATE_API_TOKEN="r8_xxxxxxxxxxxxxxxxxxxx"
 
 # Background Removal (Optional Clipdrop API)

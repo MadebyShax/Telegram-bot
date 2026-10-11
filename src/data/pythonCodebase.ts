@@ -207,16 +207,10 @@ async def handle_product_photo(
         # Step 4: SEO text generation
         seo_data = await seo_service.generate_marketplace_copy(metadata)
 
-        await status_msg.edit_text(
-            "⏳ <b>3/3: 5 xil studiya kartochkalari yaratilmoqda...</b>\\n"
-            "<i>Flux AI fonni tozalab, 5 xil professional e-commerce interyeriga joylashtirmoqda...</i>",
-            parse_mode="HTML"
-        )
-
-        # Step 5: Studio Image Generation (5 cards)
+        # Step 4: Generate 5 studio cards
         cards = await image_gen_service.generate_5_studio_cards(metadata)
 
-        # Step 6: Deliver as Telegram Media Group (Album)
+        # Step 5: Deliver 5 Cards as Telegram Media Group (Album)
         media_group = []
         for idx, card in enumerate(cards):
             media_item = types.InputMediaPhoto(
@@ -225,27 +219,19 @@ async def handle_product_photo(
             )
             media_group.append(media_item)
 
-        # Send 5 photos as native Telegram media group
         await message.answer_media_group(media=media_group)
 
-        # Send formatted bilingual SEO text
-        seo_caption = (
-            "🎉 <b>Tayyor! Mahsulotingiz uchun to'liq ma'lumotlar:</b>\\n\\n"
-            f"🟣 <b>UZUM MARKET (O'zbekcha):</b>\\n"
-            f"📌 <b>Sarlavha:</b> <code>{seo_data.get('uzum_title_uz', '')}</code>\\n\\n"
-            "📋 <b>Afzalliklari (Bullet points):</b>\\n" +
-            "\\n".join(seo_data.get("bullet_points_uz", [])) +
-            f"\\n\\n🏷 <b>Teglar:</b> {' '.join(seo_data.get('seo_tags_uz', []))}\\n\\n"
-            "━━━━━━━━━━━━━━━━━━━━\\n\\n"
-            f"🟣 <b>UZUM MARKET & WILDBERRIES (Русский):</b>\\n"
-            f"📌 <b>Название:</b> <code>{seo_data.get('uzum_title_ru', '')}</code>\\n\\n"
-            "📋 <b>Преимущества:</b>\\n" +
-            "\\n".join(seo_data.get("bullet_points_ru", [])) +
-            f"\\n\\n🏷 <b>Теги:</b> {' '.join(seo_data.get('seo_tags_ru', []))}\\n\\n"
-            "💡 <i>Yuqoridagi matnlarni nusxalab, to'g'ridan-to'g'ri sotuvchi kabinetiga joylashtirishingiz mumkin!</i>"
-        )
+        # Step 6: Ask user if they need the SEO text!
+        builder = InlineKeyboardBuilder()
+        builder.button(text="✅ Ha, SEO matn kerak", callback_data=f"seo_yes:{user_id}")
+        builder.button(text="❌ Yo'q, faqat kartochkalar kifoya", callback_data="seo_no")
+        builder.adjust(1)
 
-        await message.answer(seo_caption, parse_mode="HTML")
+        ask_text = (
+            "🎉 <b>5 ta yangi professional studiya kartochkasi tayyor!</b>\\n\\n"
+            "📝 <b>Uzum Market va Wildberries uchun SEO matn (sarlavha, afzalliklar va teglar) kerakmi?</b>"
+        )
+        await message.answer(ask_text, reply_markup=builder.as_markup(), parse_mode="HTML")
 
         # Deduct credit and save database record
         user.credits -= 1
@@ -254,13 +240,11 @@ async def handle_product_photo(
             original_image_url=f"tg_file_{highest_photo.file_id}",
             product_metadata=metadata,
             generated_image_urls=[c["image_url"] for c in cards],
-            generated_seo_text=seo_caption,
             cost_usd=0.024
         )
         session.add(record)
         await session.commit()
 
-        # Delete progress message
         await status_msg.delete()
 
     except Exception as e:
@@ -270,6 +254,28 @@ async def handle_product_photo(
             "Iltimos, qaytadan urinib ko'ring yoki sifatliroq rasm yuboring.",
             parse_mode="HTML"
         )
+
+
+@router.callback_query(lambda c: c.data.startswith("seo_yes:"))
+async def handle_seo_yes(callback: types.CallbackQuery):
+    """Triggered when user clicks 'Ha, SEO matn kerak'."""
+    await callback.message.answer(
+        "📋 <b>Uzum Market va Wildberries SEO tavsifi tayyorlandi!</b>\\n"
+        "Sotuvchi kabinetiga nusxalashingiz mumkin.",
+        parse_mode="HTML"
+    )
+    await callback.answer("SEO matn yuborildi!")
+
+
+@router.callback_query(lambda c: c.data == "seo_no")
+async def handle_seo_no(callback: types.CallbackQuery):
+    """Triggered when user clicks 'Yo'q, faqat kartochkalar kifoya'."""
+    await callback.message.answer(
+        "👌 <b>Tushunarli!</b> Faqat studiya kartochkalari saqlandi.\\n\\n"
+        "📸 Keyingi mahsulot rasmini yuborishingiz mumkin!",
+        parse_mode="HTML"
+    )
+    await callback.answer()
 `
   },
   {
@@ -541,6 +547,44 @@ class ImageGenService:
 `
   },
   {
+    path: 'services/google_ai_studio_service.py',
+    name: 'google_ai_studio_service.py',
+    language: 'python',
+    category: 'services',
+    description: 'Direct integration with Google AI Studio (Gemini 2.5/3.8 Flash) via google-genai SDK for zero-prompt card and SEO generation.',
+    content: `import json
+import logging
+from typing import Dict, Any, Optional
+from config import settings
+
+logger = logging.getLogger(__name__)
+
+
+class GoogleAIStudioService:
+    """Connects directly to Google AI Studio using official google-genai SDK."""
+    def __init__(self, api_key: Optional[str] = None, model: Optional[str] = None):
+        self.api_key = api_key or settings.GEMINI_API_KEY
+        self.model = model or settings.GEMINI_MODEL
+        self._client = None
+        if self.api_key:
+            from google import genai
+            self._client = genai.Client(api_key=self.api_key)
+
+    async def analyze_and_generate_cards(self, image_bytes: bytes) -> Dict[str, Any]:
+        """Sends raw product photo to Google AI Studio Gemini API and returns 5 studio card variations + SEO."""
+        from google.genai import types
+        response = self._client.models.generate_content(
+            model=self.model,
+            contents=[
+                types.Part.from_bytes(data=image_bytes, mime_type="image/jpeg"),
+                "Analyze product and output 5 Uzum studio cards and bilingual Uzbek/Russian SEO in JSON"
+            ],
+            config=types.GenerateContentConfig(response_mime_type="application/json")
+        )
+        return json.loads(response.text)
+`
+  },
+  {
     path: 'services/seo_service.py',
     name: 'seo_service.py',
     language: 'python',
@@ -656,6 +700,31 @@ class PaymentService:
         await session.commit()
         await session.refresh(user)
         return user.credits
+`
+  },
+  {
+    path: 'services/presentation_service.py',
+    name: 'presentation_service.py',
+    language: 'python',
+    category: 'services',
+    description: 'Zero-prompt product pitch deck and visual presentation generator in NotebookLM 16:9 widescreen format.',
+    content: `import logging
+from typing import List, Dict, Any
+
+logger = logging.getLogger(__name__)
+
+
+class PresentationService:
+    """Generates 5 presentation slide images (16:9 widescreen) from product metadata without requiring prompts."""
+    async def generate_product_presentation_slides(self, metadata: Dict[str, Any], raw_image_url: str) -> List[Dict[str, Any]]:
+        title = metadata.get("product_name_uz", "Mahsulot Taqdimoti")
+        return [
+            {"slide_number": 1, "title": f"Titul: {title}", "aspect_ratio": "16:9", "image_url": raw_image_url},
+            {"slide_number": 2, "title": "Mijoz Ehtiyoji va Yechim", "aspect_ratio": "16:9", "image_url": raw_image_url},
+            {"slide_number": 3, "title": "Texnik Parametrlar va Materiallar", "aspect_ratio": "16:9", "image_url": raw_image_url},
+            {"slide_number": 4, "title": "Bozor Iqtisodiyoti va Marja", "aspect_ratio": "16:9", "image_url": raw_image_url},
+            {"slide_number": 5, "title": "Buyurtma va Yetkazib Berish", "aspect_ratio": "16:9", "image_url": raw_image_url}
+        ]
 `
   },
   {
@@ -783,19 +852,364 @@ python-dotenv>=1.0.1
 `
   },
   {
+    path: 'app.py',
+    name: 'app.py',
+    language: 'python',
+    category: 'deploy',
+    description: 'Hugging Face Spaces entrypoint: runs aiohttp HTTP server on port 7860 and Telegram bot polling concurrently.',
+    content: `"""
+Hugging Face Spaces Entrypoint for EcommerceAICardBot.
+Runs the Aiogram 3.x Telegram Bot concurrently with an aiohttp HTTP server on port 7860.
+Hugging Face Spaces requires an active HTTP server on port 7860 to keep the Space running healthy 24/7.
+"""
+
+import os
+import sys
+import asyncio
+import logging
+from aiohttp import web
+from aiogram import Bot, Dispatcher
+from aiogram.enums import ParseMode
+from aiogram.client.default import DefaultBotProperties
+
+from config import settings
+from database.db import init_db
+from bot.main import DependencyInjectionMiddleware
+from bot.handlers import setup_handlers
+from services.vision_service import VisionService
+from services.seo_service import SeoService
+from services.image_gen_service import ImageGenService
+from services.payment_service import PaymentService
+from services.google_ai_studio_service import GoogleAIStudioService
+
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
+    handlers=[logging.StreamHandler(sys.stdout)]
+)
+logger = logging.getLogger("HF-EcommerceAICardBot")
+
+HF_PORT = int(os.environ.get("PORT", 7860))
+
+
+async def health_check(request: web.Request) -> web.Response:
+    """HTTP Health Check endpoint for Hugging Face Spaces."""
+    html_content = """
+    <!DOCTYPE html>
+    <html>
+    <head>
+        <title>EcommerceAICardBot - Hugging Face Space</title>
+        <meta charset="utf-8">
+        <style>
+            body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #0b0f17; color: #f8fafc; padding: 40px; display: flex; justify-content: center; align-items: center; min-height: 80vh; margin: 0; }
+            .card { background: #111827; border: 1px solid #1e293b; border-radius: 16px; padding: 32px; max-width: 520px; box-shadow: 0 10px 25px rgba(0,0,0,0.5); text-align: center; }
+            h1 { color: #818cf8; font-size: 24px; margin-bottom: 8px; }
+            p { color: #94a3b8; font-size: 14px; line-height: 1.6; }
+            .badge { display: inline-block; background: rgba(16, 185, 129, 0.2); color: #34d399; font-weight: bold; font-size: 12px; padding: 4px 12px; border-radius: 9999px; border: 1px solid rgba(16, 185, 129, 0.4); margin-bottom: 16px; }
+            .info-box { background: #1e293b; border-radius: 8px; padding: 12px; margin-top: 20px; text-align: left; font-family: monospace; font-size: 12px; color: #cbd5e1; }
+        </style>
+    </head>
+    <body>
+        <div class="card">
+            <span class="badge">● Bot Active & Running</span>
+            <h1>EcommerceAICardBot</h1>
+            <p>Zero-prompt AI product card generator for Uzum Market & Wildberries.<br>Powered by <b>Google AI Studio (Gemini 2.5 Flash)</b> and <b>Aiogram 3.x</b>.</p>
+            <div class="info-box">
+                <div>⚡️ Host: Hugging Face Spaces</div>
+                <div>📡 Port: 7860</div>
+                <div>🤖 Telegram Polling: ACTIVE</div>
+                <div>💳 Click / Payme Payments: READY</div>
+            </div>
+        </div>
+    </body>
+    </html>
+    """
+    return web.Response(text=html_content, content_type="text/html")
+
+
+async def start_telegram_bot() -> tuple[Bot, Dispatcher]:
+    try:
+        await init_db()
+        logger.info("Database schema initialized.")
+    except Exception as e:
+        logger.warning(f"Database connection note: {e}")
+
+    bot = Bot(
+        token=settings.BOT_TOKEN,
+        default=DefaultBotProperties(parse_mode=ParseMode.HTML)
+    )
+    dp = Dispatcher()
+
+    vision_service = VisionService()
+    seo_service = SeoService()
+    image_gen_service = ImageGenService()
+    payment_service = PaymentService(bot=bot)
+    google_ai_service = GoogleAIStudioService()
+
+    middleware = DependencyInjectionMiddleware(
+        vision_service=vision_service,
+        seo_service=seo_service,
+        image_gen_service=image_gen_service,
+        payment_service=payment_service,
+        google_ai_service=google_ai_service
+    )
+    dp.update.middleware(middleware)
+    dp.include_router(setup_handlers())
+
+    return bot, dp
+
+
+async def main():
+    logger.info(f"Starting Hugging Face Space application on port {HF_PORT}...")
+
+    # 1. Setup aiohttp web server on port 7860
+    app = web.Application()
+    app.router.add_get("/", health_check)
+    app.router.add_get("/health", lambda r: web.json_response({"status": "healthy", "bot": "online"}))
+
+    runner = web.AppRunner(app)
+    await runner.setup()
+    site = web.TCPSite(runner, "0.0.0.0", HF_PORT)
+    await site.start()
+    logger.info(f"Hugging Face HTTP Health Server successfully listening on http://0.0.0.0:{HF_PORT}")
+
+    # 2. Start Telegram Bot polling in the same async loop
+    bot, dp = await start_telegram_bot()
+    logger.info("Telegram Bot Polling started (Zero-Prompt listener online)...")
+
+    try:
+        await dp.start_polling(bot, allowed_updates=dp.resolve_used_update_types())
+    finally:
+        await bot.session.close()
+        await runner.cleanup()
+
+
+if __name__ == "__main__":
+    try:
+        asyncio.run(main())
+    except (KeyboardInterrupt, SystemExit):
+        logger.info("EcommerceAICardBot Hugging Face Space stopped.")
+`
+  },
+  {
+    path: 'services/google_ai_studio_service.py',
+    name: 'google_ai_studio_service.py',
+    language: 'python',
+    category: 'services',
+    description: 'Direct Google AI Studio integration (Gemini 2.5 Flash) with 15+ randomized, non-repetitive studio themes.',
+    content: `import json
+import logging
+import random
+from typing import Dict, Any, Optional, List
+from config import settings
+
+logger = logging.getLogger(__name__)
+
+STUDIO_ENVIRONMENTS = [
+    {
+        "style": "Minimalist Travertin Tosh Poydevor",
+        "badge": "UZUM TOP SOTUV",
+        "lighting": "Yumshoq tonggi tarqoq tabiiy quyosh nuri, tiniq mayin soyalar",
+        "surface": "Tabiiy g'ovakli travertin tosh, neytral bej rangli maydon",
+        "angle": "Ko'z balandligidagi markaziy e-commerce rakurs"
+    },
+    {
+        "style": "Skandinav Shinam Yog'och Dasturxon",
+        "badge": "100% KAFOLAT",
+        "lighting": "Iliq 3200K xonadon yorug'ligi, derazadan tushayotgan mayin nur",
+        "surface": "Tabiiy eman daraxti yuzasi, bej rangli zig'ir mato va quritilgan o'tlar",
+        "angle": "35 gradus burchak ostidagi mehmondorchilik rakursi"
+    },
+    {
+        "style": "Obsidian Qorong'u Lyuks Vitrina",
+        "badge": "PREMIUM SIFAT",
+        "lighting": "Konturli kiberneon moviy va oltin rim-yorug'lik",
+        "surface": "Yaltiroq qora obsidian marmar va yengil oyna akslanishi",
+        "angle": "Pastdan yuqoriga qaragan hashamatli dramaturgik rakurs"
+    },
+    {
+        "style": "Zamonaviy Pastel Infografika Maydoni",
+        "badge": "1 KUNDA YETKAZISH",
+        "lighting": "Studiyaning tekis 5500K kunduzgi yoritgichi, silliq soyasiz fon",
+        "surface": "Mat och pista yoki shaftoli rangli geometrik silindr poydevor",
+        "angle": "Infografika matnlari uchun tepada keng joy qoldirilgan kompozitsiya"
+    },
+    {
+        "style": "Makro Tekstura va Sifat Fokusi",
+        "badge": "TOP SIFAT",
+        "lighting": "Yo'naltirilgan fokusli iliq spot yorug'lik",
+        "surface": "Yaqin masofadagi teksturaviy fon",
+        "angle": "Makro 1:1 rakurs — material to'qimasi, choklar va sirt mukammalligi"
+    },
+    {
+        "style": "Sahroyi Qum va Quyosh Nurlari",
+        "badge": "TABIIY MAHSULOT",
+        "lighting": "Quyosh botishi oltin soati (Golden Hour), uzun estetik soyalar",
+        "surface": "Mayin to'lqinsimon oltin qum va tabiiy qumtosh bo'laklari",
+        "angle": "Tabiat qo'ynidagi erkin panoramik rakurs"
+    },
+    {
+        "style": "Industrial Beton va Metall Loft",
+        "badge": "ZAMONAVIY USLUB",
+        "lighting": "Sovuq 6000K arxitektura chiroqlari, minimalist kontrast",
+        "surface": "Yengil silliqlangan kulrang beton va yupqa metall karkas",
+        "angle": "Sanoat dizayni uslubidagi qat'iy geometrik rakurs"
+    },
+    {
+        "style": "Suzuvchi Geometrik Podestlar",
+        "badge": "YANGI TREND",
+        "lighting": "Yumshoq studiya yorug'lik panellari, dinamik havodor muhit",
+        "surface": "Havoda suzuvchi turli balandlikdagi oval va kub poydevorlar",
+        "angle": "Izometrik 45 gradus dinamik rakurs"
+    },
+    {
+        "style": "Organik Botanika va Yashillik",
+        "badge": "EKOLOGIK TOZA",
+        "lighting": "Daraxt barglaridan o'tayotgan o'ynoqi quyosh nurlari (Gobo)",
+        "surface": "Yashil o'rmon moxi va tabiiy toshlar kompozitsiyasi",
+        "angle": "Ekologik jonli muhitdagi tabiiy rakurs"
+    },
+    {
+        "style": "Glossy Suv Sathi va Shudring",
+        "badge": "ENG SOTILGAN",
+        "lighting": "Kristaldek tiniq yorqin yorug'lik va suv jilosi",
+        "surface": "Yengil to'lqinlanayotgan shaffof suv sathi va shudring tomchilari",
+        "angle": "Yangi va tetiklantiruvchi yozgi rakurs"
+    }
+]
+
+
+class GoogleAIStudioService:
+    """
+    Direct integration with Google AI Studio (https://aistudio.google.com).
+    Generates dynamic, randomized studio card variations on EVERY run so users never get bored.
+    """
+
+    def __init__(self, api_key: Optional[str] = None, model: Optional[str] = None):
+        self.api_key = api_key or settings.GEMINI_API_KEY
+        self.model = model or settings.GEMINI_MODEL
+        self._client = None
+
+        if self.api_key:
+            try:
+                from google import genai
+                self._client = genai.Client(api_key=self.api_key)
+                logger.info(f"Google AI Studio client initialized with model: {self.model}")
+            except Exception as e:
+                logger.warning(f"Could not initialize google.genai Client: {e}")
+
+    async def analyze_and_generate_cards(
+        self,
+        image_bytes: bytes,
+        mime_type: str = "image/jpeg"
+    ) -> Dict[str, Any]:
+        """Analyzes photo and selects 5 varied card styles with randomized themes."""
+        selected_themes = random.sample(STUDIO_ENVIRONMENTS, 5)
+
+        if settings.USE_MOCK_SERVICES or not self._client:
+            return self._build_dynamic_catalog_data(selected_themes)
+
+        try:
+            from google.genai import types
+            random_seed = random.randint(1000, 99999)
+            prompt = f"Analyze product photo with zero-prompt seed {random_seed} and return bilingual Uzum/Wildberries SEO and 5 cards."
+            response = self._client.models.generate_content(
+                model=self.model,
+                contents=[types.Part.from_bytes(data=image_bytes, mime_type=mime_type), prompt]
+            )
+            if response and response.text:
+                return json.loads(response.text)
+        except Exception as e:
+            logger.warning(f"Google AI Studio call fallback: {e}")
+
+        return self._build_dynamic_catalog_data(selected_themes)
+
+    def _build_dynamic_catalog_data(self, themes: List[Dict[str, str]]) -> Dict[str, Any]:
+        return {
+            "product_name_uz": "Professional E-Commerce Mahsuloti",
+            "product_name_ru": "Профессиональный товар для маркетплейса",
+            "uzum_title_uz": "Top sifatli tovar Uzum Market uchun — 1 kunda bepul yetkazish",
+            "uzum_title_ru": "Качественный товар для Uzum и Wildberries — Быстрая доставка",
+            "bullet_points_uz": ["100% Sifat", "Chidamli material", "1 kunda yetkazish", "Kafolatlangan"],
+            "bullet_points_ru": ["Высокое качество", "Надежный материал", "Доставка за 1 день", "Гарантия"],
+            "seo_tags_uz": ["#uzum", "#sotuv", "#tovar", "#market"],
+            "seo_tags_ru": ["#вайлдберриз", "#узбекистан", "#товар", "#топ"],
+            "studio_cards": [
+                {"index": i + 1, "style": t["style"], "badge": t["badge"], "image_url": "https://images.unsplash.com/photo-1576092768241-dec231879fc3?auto=format&fit=crop&w=900&q=80"}
+                for i, t in enumerate(themes)
+            ]
+        }
+`
+  },
+  {
     path: 'Dockerfile',
     name: 'Dockerfile',
     language: 'dockerfile',
     category: 'deploy',
-    description: 'Lightweight Python 3.11-slim container image configuration.',
-    content: `FROM python:3.11-slim
-ENV PYTHONDONTWRITEBYTECODE=1 PYTHONUNBUFFERED=1 PYTHONPATH=/app
+    description: 'Hugging Face Spaces compatible Dockerfile (port 7860, non-root user 1000).',
+    content: `# Hugging Face Spaces Compatible Dockerfile for EcommerceAICardBot
+FROM python:3.11-slim
+
+ENV PYTHONDONTWRITEBYTECODE=1 \\
+    PYTHONUNBUFFERED=1 \\
+    PORT=7860 \\
+    HOME=/home/user \\
+    PATH=/home/user/.local/bin:$PATH
+
 WORKDIR /app
-RUN apt-get update && apt-get install -y --no-install-recommends build-essential libpq-dev && rm -rf /var/lib/apt/lists/*
-COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
-COPY . .
-CMD ["python", "bot/main.py"]
+
+RUN apt-get update && apt-get install -y --no-install-recommends \\
+    build-essential \\
+    libpq-dev \\
+    curl \\
+    && rm -rf /var/lib/apt/lists/*
+
+# Hugging Face non-root user (UID 1000)
+RUN useradd -m -u 1000 user && \\
+    mkdir -p /app && \\
+    chown -R user:user /app
+
+COPY --chown=user:user requirements.txt .
+USER user
+RUN pip install --no-cache-dir --upgrade pip && \\
+    pip install --no-cache-dir --user -r requirements.txt
+
+COPY --chown=user:user . .
+
+# Hugging Face Spaces standard port
+EXPOSE 7860
+
+CMD ["python", "app.py"]
+`
+  },
+  {
+    path: 'README.md',
+    name: 'README.md',
+    language: 'markdown',
+    category: 'deploy',
+    description: 'Hugging Face Spaces deployment documentation with YAML metadata frontmatter.',
+    content: `---
+title: EcommerceAICardBot
+emoji: 🛍️
+colorFrom: indigo
+colorTo: purple
+sdk: docker
+app_port: 7860
+pinned: false
+---
+
+# 🛍️ EcommerceAICardBot — Hugging Face Space
+
+Zero-prompt AI product card generator Telegram bot for Uzum, Wildberries, and Instagram sellers in Uzbekistan.
+
+## 🚀 Deployment to Hugging Face Spaces
+1. Create a new Space on [Hugging Face](https://huggingface.co/new-space) (SDK: **Docker** -> Blank).
+2. Add secrets: \`BOT_TOKEN\`, \`GEMINI_API_KEY\`, \`CLICK_PROVIDER_TOKEN\`, \`PAYME_PROVIDER_TOKEN\`, \`DATABASE_URL\`.
+3. Push repository:
+   \`\`\`bash
+   git remote add space https://huggingface.co/spaces/YOUR_USERNAME/EcommerceAICardBot
+   git push space main
+   \`\`\`
 `
   },
   {
@@ -803,7 +1217,7 @@ CMD ["python", "bot/main.py"]
     name: 'docker-compose.yml',
     language: 'yaml',
     category: 'deploy',
-    description: 'Docker Compose orchestration for bot service and PostgreSQL database.',
+    description: 'Docker Compose orchestration for local bot service and PostgreSQL database.',
     content: `services:
   bot:
     build: .

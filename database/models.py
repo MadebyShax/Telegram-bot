@@ -6,6 +6,7 @@ from sqlalchemy import (
     BigInteger,
     String,
     Integer,
+    Boolean,
     Numeric,
     Text,
     DateTime,
@@ -28,7 +29,10 @@ class User(Base):
     telegram_id: Mapped[int] = mapped_column(BigInteger, primary_key=True)
     username: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
     full_name: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
+    phone_number: Mapped[Optional[str]] = mapped_column(String(30), unique=True, nullable=True)
+    is_phone_verified: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
     credits: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    language: Mapped[str] = mapped_column(String(10), default="uz", nullable=False)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
         server_default=func.now(),
