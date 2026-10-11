@@ -1,0 +1,30 @@
+# Telegram Bot Configuration (Obtain from @BotFather)
+BOT_TOKEN="1234567890:ABCdefGHIjklMNOpqrsTUVwxyz"
+
+# Database Configuration (PostgreSQL / Supabase with asyncpg)
+DATABASE_URL="postgresql+asyncpg://postgres:postgres@localhost:5432/ecommerce_bot"
+
+# Telegram Native Payment Tokens
+# Click provider token (from @BotFather -> Payments -> Click)
+CLICK_PROVIDER_TOKEN="398061629:TEST:999999"
+
+# Payme provider token (from @BotFather -> Payments -> Payme)
+PAYME_PROVIDER_TOKEN="371317599:TEST:999999"
+
+# AI Vision Analysis (OpenAI GPT-4o)
+OPENAI_API_KEY="sk-proj-xxxxxxxxxxxxxxxxxxxx"
+OPENAI_MODEL="gpt-4o"
+
+# AI Studio Image Generation (Flux.1 Schnell via Replicate or Fal.ai)
+REPLICATE_API_TOKEN="r8_xxxxxxxxxxxxxxxxxxxx"
+
+# Background Removal (Optional Clipdrop API)
+CLIPDROP_API_KEY="xxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+
+# Pricing (UZS)
+PACKAGE_PRICE_UZS=15000
+CARDS_PER_PACKAGE=5
+FREE_TRIAL_CREDITS=1
+
+# Mock mode for testing without paid API keys (true/false)
+USE_MOCK_SERVICES=false
