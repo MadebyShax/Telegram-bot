@@ -125,37 +125,37 @@ if __name__ == "__main__":
     name: 'upload.py',
     language: 'python',
     category: 'bot',
-    description: 'Zero-prompt photo handler: verifies credits, runs GPT-4o vision, generates SEO text, renders 5 Flux studio cards, sends media group.',
+    description: 'Zero-prompt photo handler: verifies credits, prompts for infographics preference, generates 5 distinct Google AI Studio cards, asks if SEO is needed.',
     content: `import io
 import logging
+from typing import Optional
 from aiogram import Router, types, F, Bot
 from aiogram.utils.keyboard import InlineKeyboardBuilder
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 from database.models import User, CardGeneration
-from services.vision_service import VisionService
-from services.seo_service import SeoService
+from services.google_ai_studio_service import GoogleAIStudioService
 from services.image_gen_service import ImageGenService
 from config import settings
 
 logger = logging.getLogger(__name__)
 router = Router(name="upload")
 
+PENDING_PHOTO_UPLOADS: dict[int, bytes] = {}
+PENDING_SEO_DATA: dict[int, dict] = {}
+
 
 @router.message(F.photo)
 async def handle_product_photo(
     message: types.Message,
     bot: Bot,
-    session: AsyncSession,
-    vision_service: VisionService,
-    seo_service: SeoService,
-    image_gen_service: ImageGenService
+    session: AsyncSession
 ):
     """
     Zero-prompt workflow:
-    User uploads a raw product photo without writing anything.
-    Bot verifies credits, executes vision analysis, generates SEO copy,
-    renders 5 studio variations, and sends the finished media group!
+    1. Checks credits.
+    2. Downloads & caches product photo.
+    3. Asks user whether infographics is needed or clean photo is preferred!
     """
     user_id = message.from_user.id
 
@@ -171,7 +171,7 @@ async def handle_product_photo(
         builder.adjust(2)
 
         await message.answer(
-            "⚠️ <b>Balansingizda generatsiya paketlari tugadi.</b>\\n\\n"
+            "⚠️ <b>Balansingizda generatsiya paketlari tugadi.</b>\\\\n\\\\n"
             "5 ta professional e-commerce studiya kartochkasi va to'liq SEO tavsif "
             "yaratish uchun hisobingizni to'ldiring (15,000 UZS):",
             reply_markup=builder.as_markup(),
@@ -179,78 +179,140 @@ async def handle_product_photo(
         )
         return
 
-    # 2. Acknowledge and download photo
-    status_msg = await message.answer(
-        "⏳ <b>1/3: Mahsulot tahlil qilinmoqda...</b>\\n"
-        "<i>GPT-4o Vision mahsulot turi, rangi, materiali va shaklini aniqlamoqda...</i>",
-        parse_mode="HTML"
-    )
-
+    # 2. Download and cache photo
     try:
-        # Get highest resolution photo
         highest_photo = message.photo[-1]
         file_info = await bot.get_file(highest_photo.file_id)
         photo_bytes_io = io.BytesIO()
         await bot.download_file(file_info.file_path, destination=photo_bytes_io)
         raw_image_bytes = photo_bytes_io.getvalue()
+        PENDING_PHOTO_UPLOADS[user_id] = raw_image_bytes
 
-        # Step 3: Vision analysis
-        metadata = await vision_service.analyze_product_image(raw_image_bytes)
+        # 3. Ask about Infographics (Infografika so'ralsin va marketlar yozuvi kerakmas)
+        builder = InlineKeyboardBuilder()
+        builder.button(text="✨ Ha, infografika bilan", callback_data=f"info_yes:{user_id}")
+        builder.button(text="📸 Yo'q, toza fotosurat", callback_data=f"info_no:{user_id}")
+        builder.adjust(1)
 
-        await status_msg.edit_text(
-            "⏳ <b>2/3: SEO matn tayyorlanmoqda...</b>\\n"
-            f"<i>Mahsulot aniqlandi: <b>{metadata.get('product_name_uz', 'Mahsulot')}</b>\\n"
-            "Uzum Market va Wildberries uchun o'zbek/rus tavsiflari yozilmoqda...</i>",
+        ask_infographics_text = (
+            "📸 <b>Mahsulot surati qabul qilindi!</b>\\\\n\\\\n"
+            "📊 <b>Mahsulot kartochkalariga Infografika qo'shilsinmi?</b>\\\\n\\\\n"
+            "✨ <b>Ha, infografika bilan</b> — mahsulotning asosiy afzalliklari, xususiyatlari va vizual belgilari bilan\\\\n"
+            "📸 <b>Yo'q, toza fotosurat</b> — hech qanday yozuv va belgilarsiz toza studiya suratlari"
+        )
+
+        await message.answer(ask_infographics_text, reply_markup=builder.as_markup(), parse_mode="HTML")
+
+    except Exception as e:
+        logger.exception(f"Error caching product photo: {e}")
+        await message.answer(
+            "❌ <b>Rasmni qabul qilishda xatolik yuz berdi.</b>\\\\n"
+            "Iltimos, qaytadan urinib ko'ring.",
             parse_mode="HTML"
         )
 
-        # Step 4: SEO text generation
-        seo_data = await seo_service.generate_marketplace_copy(metadata)
 
-        # Step 4: Generate 5 studio cards
-        cards = await image_gen_service.generate_5_studio_cards(metadata)
+@router.callback_query(lambda c: c.data.startswith("info_yes:") or c.data.startswith("info_no:"))
+async def handle_infographics_selection(
+    callback: types.CallbackQuery,
+    session: AsyncSession,
+    image_gen_service: ImageGenService,
+    google_ai_service: Optional[GoogleAIStudioService] = None
+):
+    user_id = callback.from_user.id
+    with_infographics = callback.data.startswith("info_yes:")
+    raw_image_bytes = PENDING_PHOTO_UPLOADS.get(user_id)
 
-        # Step 5: Deliver 5 Cards as Telegram Media Group (Album)
+    if not raw_image_bytes:
+        await callback.message.answer(
+            "⚠️ Rasm sessiyasi muddati tugadi. Iltimos, mahsulot rasmini qaytadan yuboring.",
+            parse_mode="HTML"
+        )
+        await callback.answer()
+        return
+
+    stmt = select(User).where(User.telegram_id == user_id)
+    result = await session.execute(stmt)
+    user = result.scalar_one_or_none()
+
+    if not user or user.credits <= 0:
+        await callback.answer("Balansingizda paketlar yetarli emas!", show_alert=True)
+        return
+
+    choice_text = (
+        "✨ <b>Infografika tanlandi.</b> Mahsulot afzalliklari bilan 5 ta kartochka tayyorlanmoqda..."
+        if with_infographics
+        else "📸 <b>Toza fotosurat tanlandi.</b> Yozuvsiz toza studiya suratlari tayyorlanmoqda..."
+    )
+
+    status_msg = await callback.message.answer(
+        f"⏳ <b>Google AI Studio tahlil qilmoqda...</b>\\\\n<i>{choice_text}</i>",
+        parse_mode="HTML"
+    )
+    await callback.answer()
+
+    try:
+        ai_service = google_ai_service or GoogleAIStudioService()
+        catalog_data = await ai_service.analyze_and_generate_cards(
+            raw_image_bytes,
+            include_infographics=with_infographics
+        )
+
+        cards = catalog_data.get("studio_cards", [])
+        if not cards or len(cards) < 5:
+            cards = await image_gen_service.generate_5_studio_cards(catalog_data)
+
+        if not with_infographics:
+            for c in cards:
+                c["badge"] = ""
+
         media_group = []
         for idx, card in enumerate(cards):
+            caption = ""
+            if idx == 0:
+                if with_infographics and card.get("badge"):
+                    caption = f"📸 <b>Kartochka 1: {card['style']}</b>\\\\n🏷 <i>Afzallik belgisi: {card['badge']}</i>"
+                else:
+                    caption = f"📸 <b>Kartochka 1: {card['style']}</b>\\\\n✨ <i>Toza studiya fotosessiyasi</i>"
+
             media_item = types.InputMediaPhoto(
                 media=card["image_url"],
-                caption=f"📸 <b>Kartochka {idx + 1}: {card['style']}</b>\\n🏷 <i>Tavsiya etilgan belgi: {card['badge']}</i>" if idx == 0 else ""
+                caption=caption,
+                parse_mode="HTML" if caption else None
             )
             media_group.append(media_item)
 
-        await message.answer_media_group(media=media_group)
+        await callback.message.answer_media_group(media=media_group)
+        PENDING_SEO_DATA[user_id] = catalog_data
 
-        # Step 6: Ask user if they need the SEO text!
+        # Ask if SEO is needed (NO marketplace brand names!)
         builder = InlineKeyboardBuilder()
         builder.button(text="✅ Ha, SEO matn kerak", callback_data=f"seo_yes:{user_id}")
         builder.button(text="❌ Yo'q, faqat kartochkalar kifoya", callback_data="seo_no")
         builder.adjust(1)
 
-        ask_text = (
-            "🎉 <b>5 ta yangi professional studiya kartochkasi tayyor!</b>\\n\\n"
-            "📝 <b>Uzum Market va Wildberries uchun SEO matn (sarlavha, afzalliklar va teglar) kerakmi?</b>"
+        ask_seo_text = (
+            "🎉 <b>5 ta yangi professional studiya kartochkasi tayyor!</b>\\\\n\\\\n"
+            "📝 <b>Mahsulot uchun professional SEO tavsifi (sarlavha, afzalliklar va qidiruv teglari) kerakmi?</b>"
         )
-        await message.answer(ask_text, reply_markup=builder.as_markup(), parse_mode="HTML")
+        await callback.message.answer(ask_seo_text, reply_markup=builder.as_markup(), parse_mode="HTML")
 
-        # Deduct credit and save database record
         user.credits -= 1
         record = CardGeneration(
             user_id=user_id,
-            original_image_url=f"tg_file_{highest_photo.file_id}",
-            product_metadata=metadata,
+            original_image_url="tg_user_upload",
+            product_metadata=catalog_data,
             generated_image_urls=[c["image_url"] for c in cards],
             cost_usd=0.024
         )
         session.add(record)
         await session.commit()
-
         await status_msg.delete()
 
     except Exception as e:
-        logger.exception(f"Error processing zero-prompt photo upload: {e}")
+        logger.exception(f"Error processing card generation: {e}")
         await status_msg.edit_text(
-            "❌ <b>Xatolik yuz berdi.</b>\\n"
+            "❌ <b>Xatolik yuz berdi.</b>\\\\n"
             "Iltimos, qaytadan urinib ko'ring yoki sifatliroq rasm yuboring.",
             parse_mode="HTML"
         )
@@ -258,20 +320,44 @@ async def handle_product_photo(
 
 @router.callback_query(lambda c: c.data.startswith("seo_yes:"))
 async def handle_seo_yes(callback: types.CallbackQuery):
-    """Triggered when user clicks 'Ha, SEO matn kerak'."""
-    await callback.message.answer(
-        "📋 <b>Uzum Market va Wildberries SEO tavsifi tayyorlandi!</b>\\n"
-        "Sotuvchi kabinetiga nusxalashingiz mumkin.",
-        parse_mode="HTML"
+    user_id = callback.from_user.id
+    seo_data = PENDING_SEO_DATA.get(user_id)
+
+    if not seo_data:
+        await callback.message.answer(
+            "Ma'lumotlar yangilandi. Iltimos, yangi mahsulot rasmini yuboring.",
+            parse_mode="HTML"
+        )
+        await callback.answer()
+        return
+
+    bullets_uz = "\\\\n".join(seo_data.get("bullet_points_uz", []))
+    bullets_ru = "\\\\n".join(seo_data.get("bullet_points_ru", []))
+    tags_uz = " ".join(seo_data.get("seo_tags_uz", []))
+    tags_ru = " ".join(seo_data.get("seo_tags_ru", []))
+
+    seo_caption = (
+        "📋 <b>Sizning mahsulotingiz uchun tayyor SEO tavsifi:</b>\\\\n\\\\n"
+        "🇺🇿 <b>O'zbek tilida:</b>\\\\n"
+        f"📌 <b>Sarlavha:</b> <code>{seo_data.get('uzum_title_uz', '')}</code>\\\\n\\\\n"
+        f"📋 <b>Afzalliklari:</b>\\\\n{bullets_uz}\\\\n\\\\n"
+        f"🏷 <b>Qidiruv teglari:</b> {tags_uz}\\\\n\\\\n"
+        "━━━━━━━━━━━━━━━━━━━━\\\\n\\\\n"
+        "🇷🇺 <b>На русском языке:</b>\\\\n"
+        f"📌 <b>Название:</b> <code>{seo_data.get('uzum_title_ru', '')}</code>\\\\n\\\\n"
+        f"📋 <b>Преимущества:</b>\\\\n{bullets_ru}\\\\n\\\\n"
+        f"🏷 <b>Поисковые теги:</b> {tags_ru}\\\\n\\\\n"
+        "💡 <i>Nusxalab oling va mahsulot kartochkangizga joylashtiring!</i>"
     )
+
+    await callback.message.answer(seo_caption, parse_mode="HTML")
     await callback.answer("SEO matn yuborildi!")
 
 
 @router.callback_query(lambda c: c.data == "seo_no")
 async def handle_seo_no(callback: types.CallbackQuery):
-    """Triggered when user clicks 'Yo'q, faqat kartochkalar kifoya'."""
     await callback.message.answer(
-        "👌 <b>Tushunarli!</b> Faqat studiya kartochkalari saqlandi.\\n\\n"
+        "👌 <b>Tushunarli!</b> Faqat studiya kartochkalari saqlandi.\\\\n\\\\n"
         "📸 Keyingi mahsulot rasmini yuborishingiz mumkin!",
         parse_mode="HTML"
     )
@@ -996,7 +1082,7 @@ if __name__ == "__main__":
     name: 'google_ai_studio_service.py',
     language: 'python',
     category: 'services',
-    description: 'Direct Google AI Studio integration (Gemini 2.5 Flash) with 15+ randomized, non-repetitive studio themes.',
+    description: 'Direct Google AI Studio integration (Gemini 2.5 Flash) with 15+ randomized studio themes, optional infographics, and no marketplace branding.',
     content: `import json
 import logging
 import random
@@ -1008,7 +1094,7 @@ logger = logging.getLogger(__name__)
 STUDIO_ENVIRONMENTS = [
     {
         "style": "Minimalist Travertin Tosh Poydevor",
-        "badge": "UZUM TOP SOTUV",
+        "badge": "TOP SIFAT",
         "lighting": "Yumshoq tonggi tarqoq tabiiy quyosh nuri, tiniq mayin soyalar",
         "surface": "Tabiiy g'ovakli travertin tosh, neytral bej rangli maydon",
         "angle": "Ko'z balandligidagi markaziy e-commerce rakurs"
@@ -1029,21 +1115,21 @@ STUDIO_ENVIRONMENTS = [
     },
     {
         "style": "Zamonaviy Pastel Infografika Maydoni",
-        "badge": "1 KUNDA YETKAZISH",
+        "badge": "ORIGINAL MAHSULOT",
         "lighting": "Studiyaning tekis 5500K kunduzgi yoritgichi, silliq soyasiz fon",
         "surface": "Mat och pista yoki shaftoli rangli geometrik silindr poydevor",
         "angle": "Infografika matnlari uchun tepada keng joy qoldirilgan kompozitsiya"
     },
     {
         "style": "Makro Tekstura va Sifat Fokusi",
-        "badge": "TOP SIFAT",
+        "badge": "MAXSUS DETALLAR",
         "lighting": "Yo'naltirilgan fokusli iliq spot yorug'lik",
         "surface": "Yaqin masofadagi teksturaviy fon",
         "angle": "Makro 1:1 rakurs — material to'qimasi, choklar va sirt mukammalligi"
     },
     {
         "style": "Sahroyi Qum va Quyosh Nurlari",
-        "badge": "TABIIY MAHSULOT",
+        "badge": "TABIIY TARKIB",
         "lighting": "Quyosh botishi oltin soati (Golden Hour), uzun estetik soyalar",
         "surface": "Mayin to'lqinsimon oltin qum va tabiiy qumtosh bo'laklari",
         "angle": "Tabiat qo'ynidagi erkin panoramik rakurs"
@@ -1080,11 +1166,6 @@ STUDIO_ENVIRONMENTS = [
 
 
 class GoogleAIStudioService:
-    """
-    Direct integration with Google AI Studio (https://aistudio.google.com).
-    Generates dynamic, randomized studio card variations on EVERY run so users never get bored.
-    """
-
     def __init__(self, api_key: Optional[str] = None, model: Optional[str] = None):
         self.api_key = api_key or settings.GEMINI_API_KEY
         self.model = model or settings.GEMINI_MODEL
@@ -1101,41 +1182,55 @@ class GoogleAIStudioService:
     async def analyze_and_generate_cards(
         self,
         image_bytes: bytes,
-        mime_type: str = "image/jpeg"
+        mime_type: str = "image/jpeg",
+        include_infographics: bool = True
     ) -> Dict[str, Any]:
         """Analyzes photo and selects 5 varied card styles with randomized themes."""
         selected_themes = random.sample(STUDIO_ENVIRONMENTS, 5)
 
         if settings.USE_MOCK_SERVICES or not self._client:
-            return self._build_dynamic_catalog_data(selected_themes)
+            return self._build_dynamic_catalog_data(selected_themes, include_infographics)
 
         try:
             from google.genai import types
             random_seed = random.randint(1000, 99999)
-            prompt = f"Analyze product photo with zero-prompt seed {random_seed} and return bilingual Uzum/Wildberries SEO and 5 cards."
+            prompt = (
+                f"Analyze product photo with zero-prompt seed {random_seed}. "
+                "CRITICAL: Do NOT include ANY marketplace brand names (such as Uzum, Wildberries, Ozon). "
+                f"Include infographics badges: {include_infographics}. Return bilingual e-commerce copy and 5 studio cards JSON."
+            )
             response = self._client.models.generate_content(
                 model=self.model,
                 contents=[types.Part.from_bytes(data=image_bytes, mime_type=mime_type), prompt]
             )
             if response and response.text:
-                return json.loads(response.text)
+                data = json.loads(response.text)
+                if not include_infographics and "studio_cards" in data:
+                    for c in data["studio_cards"]:
+                        c["badge"] = ""
+                return data
         except Exception as e:
             logger.warning(f"Google AI Studio call fallback: {e}")
 
-        return self._build_dynamic_catalog_data(selected_themes)
+        return self._build_dynamic_catalog_data(selected_themes, include_infographics)
 
-    def _build_dynamic_catalog_data(self, themes: List[Dict[str, str]]) -> Dict[str, Any]:
+    def _build_dynamic_catalog_data(self, themes: List[Dict[str, str]], include_infographics: bool = True) -> Dict[str, Any]:
         return {
             "product_name_uz": "Professional E-Commerce Mahsuloti",
-            "product_name_ru": "Профессиональный товар для маркетплейса",
-            "uzum_title_uz": "Top sifatli tovar Uzum Market uchun — 1 kunda bepul yetkazish",
-            "uzum_title_ru": "Качественный товар для Uzum и Wildberries — Быстрая доставка",
-            "bullet_points_uz": ["100% Sifat", "Chidamli material", "1 kunda yetkazish", "Kafolatlangan"],
-            "bullet_points_ru": ["Высокое качество", "Надежный материал", "Доставка за 1 день", "Гарантия"],
-            "seo_tags_uz": ["#uzum", "#sotuv", "#tovar", "#market"],
-            "seo_tags_ru": ["#вайлдберриз", "#узбекистан", "#товар", "#топ"],
+            "product_name_ru": "Профессиональный товар для онлайн-продаж",
+            "uzum_title_uz": "Yuqori sifatli mahsulot, qulay va chidamli model",
+            "uzum_title_ru": "Качественный товар для дома и повседневного использования",
+            "bullet_points_uz": ["100% Sifat", "Chidamli material", "Tezkor yetkazish", "Rasmiy kafolatlangan"],
+            "bullet_points_ru": ["Высокое качество", "Надежный материал", "Быстрая доставка", "Официальная гарантия"],
+            "seo_tags_uz": ["#sifatli", "#sotuv", "#tovar", "#original"],
+            "seo_tags_ru": ["#качество", "#товар", "#оригинал", "#топ"],
             "studio_cards": [
-                {"index": i + 1, "style": t["style"], "badge": t["badge"], "image_url": "https://images.unsplash.com/photo-1576092768241-dec231879fc3?auto=format&fit=crop&w=900&q=80"}
+                {
+                    "index": i + 1,
+                    "style": t["style"],
+                    "badge": t["badge"] if include_infographics else "",
+                    "image_url": "https://images.unsplash.com/photo-1576092768241-dec231879fc3?auto=format&fit=crop&w=900&q=80"
+                }
                 for i, t in enumerate(themes)
             ]
         }

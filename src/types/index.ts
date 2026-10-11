@@ -32,11 +32,13 @@ export interface TelegramMessage {
   id: string;
   sender: 'user' | 'bot' | 'system';
   timestamp: string;
-  type: 'text' | 'photo' | 'invoice' | 'media_group' | 'status_progress';
+  type: 'text' | 'photo' | 'invoice' | 'media_group' | 'status_progress' | 'ask_infographics';
   text?: string;
   imageUrl?: string;
   mediaGroup?: StudioCard[];
   productMetadata?: ProductMetadata;
+  pendingProductData?: any;
+  withInfographics?: boolean;
   invoiceData?: {
     title: string;
     description: string;

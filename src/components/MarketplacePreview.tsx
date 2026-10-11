@@ -12,7 +12,7 @@ export const MarketplacePreview: React.FC<MarketplacePreviewProps> = ({
   productData: incomingProduct,
   studioCards: incomingCards,
 }) => {
-  const [platform, setPlatform] = useState<'uzum' | 'wildberries'>('uzum');
+  const [viewMode, setViewMode] = useState<'desktop' | 'mobile'>('desktop');
   const [lang, setLang] = useState<'uz' | 'ru'>('uz');
   const [copiedKey, setCopiedKey] = useState<string | null>(null);
 
@@ -30,7 +30,7 @@ export const MarketplacePreview: React.FC<MarketplacePreviewProps> = ({
     setTimeout(() => setCopiedKey(null), 2000);
   };
 
-  const isUzum = platform === 'uzum';
+  const isDesktop = viewMode === 'desktop';
   const priceUzs = product.suggested_price_uzs || 185000;
   const monthlyNasiya = Math.round(priceUzs / 9);
 
@@ -39,68 +39,61 @@ export const MarketplacePreview: React.FC<MarketplacePreviewProps> = ({
       {/* Platform Switcher & Action Bar */}
       <div className="flex flex-wrap items-center justify-between gap-4 bg-[#111827] border border-slate-800 rounded-2xl p-4 shadow-sm">
         <div className="flex items-center gap-3">
-          <span className="text-xs font-semibold text-slate-400">Bozor maydoni vitrinasi:</span>
+          <span className="text-xs font-semibold text-slate-400">Vitrina rejimi:</span>
           <div className="flex items-center bg-slate-900 border border-slate-700/80 rounded-xl p-1">
             <button
-              onClick={() => setPlatform('uzum')}
+              onClick={() => setViewMode('desktop')}
               className={`px-4 py-1.5 rounded-lg text-xs font-bold transition-all ${
-                isUzum
+                isDesktop
                   ? 'bg-gradient-to-r from-violet-600 to-indigo-600 text-white shadow'
                   : 'text-slate-400 hover:text-white'
               }`}
             >
-              🟣 Uzum Market (uzum.uz)
+              🛍 E-Commerce Do'kon (Desktop)
             </button>
             <button
-              onClick={() => {
-                setPlatform('wildberries');
-                setLang('ru');
-              }}
+              onClick={() => setViewMode('mobile')}
               className={`px-4 py-1.5 rounded-lg text-xs font-bold transition-all ${
-                !isUzum
+                !isDesktop
                   ? 'bg-gradient-to-r from-purple-700 to-pink-600 text-white shadow'
                   : 'text-slate-400 hover:text-white'
               }`}
             >
-              🍇 Wildberries (wildberries.ru)
+              📱 Mobil Ilova Vitrinasi
             </button>
           </div>
         </div>
 
-        {/* Language selector (for Uzum) */}
-        {isUzum && (
-          <div className="flex items-center gap-2">
-            <span className="text-xs text-slate-400">Til:</span>
-            <div className="flex bg-slate-900 rounded-lg p-0.5 border border-slate-800 text-xs">
-              <button
-                onClick={() => setLang('uz')}
-                className={`px-3 py-1 rounded-md font-semibold transition-colors ${
-                  lang === 'uz' ? 'bg-indigo-600 text-white' : 'text-slate-400 hover:text-white'
-                }`}
-              >
-                O'zbekcha
-              </button>
-              <button
-                onClick={() => setLang('ru')}
-                className={`px-3 py-1 rounded-md font-semibold transition-colors ${
-                  lang === 'ru' ? 'bg-indigo-600 text-white' : 'text-slate-400 hover:text-white'
-                }`}
-              >
-                Русский
-              </button>
-            </div>
+        {/* Language selector */}
+        <div className="flex items-center gap-2">
+          <span className="text-xs text-slate-400">Til:</span>
+          <div className="flex bg-slate-900 rounded-lg p-0.5 border border-slate-800 text-xs">
+            <button
+              onClick={() => setLang('uz')}
+              className={`px-3 py-1 rounded-md font-semibold transition-colors ${
+                lang === 'uz' ? 'bg-indigo-600 text-white' : 'text-slate-400 hover:text-white'
+              }`}
+            >
+              O'zbekcha
+            </button>
+            <button
+              onClick={() => setLang('ru')}
+              className={`px-3 py-1 rounded-md font-semibold transition-colors ${
+                lang === 'ru' ? 'bg-indigo-600 text-white' : 'text-slate-400 hover:text-white'
+              }`}
+            >
+              Русский
+            </button>
           </div>
-        )}
+        </div>
 
         <div className="flex items-center gap-2">
           <button
             onClick={() =>
               handleCopy(
-                isUzum
-                  ? lang === 'uz'
-                    ? `${product.uzum_title_uz}\n\n${product.bullet_points_uz.join('\n')}`
-                    : `${product.uzum_title_ru}\n\n${product.bullet_points_ru.join('\n')}`
-                  : `${product.wildberries_title_ru}\n\n${product.bullet_points_ru.join('\n')}`,
+                lang === 'uz'
+                  ? `${product.uzum_title_uz}\n\n${product.bullet_points_uz.join('\n')}`
+                  : `${product.uzum_title_ru}\n\n${product.bullet_points_ru.join('\n')}`,
                 'all-seller-text'
               )
             }
@@ -116,26 +109,26 @@ export const MarketplacePreview: React.FC<MarketplacePreviewProps> = ({
         </div>
       </div>
 
-      {/* Simulated Marketplace Product Page */}
+      {/* Simulated Product Page */}
       <div className="bg-[#0f172a] border border-slate-800 rounded-2xl overflow-hidden shadow-2xl">
-        {/* Marketplace Mock Browser Header */}
+        {/* Mock Browser Header */}
         <div className="px-6 py-3 border-b border-slate-800 bg-slate-900/80 flex items-center justify-between text-xs text-slate-400">
           <div className="flex items-center gap-2">
             <span className="font-bold text-white text-sm">
-              {isUzum ? 'uzum market' : 'WILDBERRIES'}
+              E-COMMERCE STORE
             </span>
             <span className="hidden sm:inline-block text-slate-500">|</span>
             <span className="hidden sm:inline-block text-slate-400">
-              {isUzum ? 'Katalog / ' + product.category : 'Каталог товаров'}
+              Katalog / {product.category}
             </span>
           </div>
 
           <div className="flex items-center gap-4 text-[11px]">
             <span className="text-emerald-400 flex items-center gap-1">
               <Truck className="w-3.5 h-3.5" />
-              {isUzum ? '1 kunda bepul yetkazish' : 'Бесплатная доставка'}
+              Tezkor va xavfsiz yetkazish
             </span>
-            <span className="text-slate-400">Toshkent</span>
+            <span className="text-slate-400">Online Do'kon</span>
           </div>
         </div>
 
@@ -152,14 +145,16 @@ export const MarketplacePreview: React.FC<MarketplacePreviewProps> = ({
                 className="w-full h-full object-cover"
               />
 
-              {/* Graphic Badge */}
-              <div className="absolute top-3 left-3 bg-gradient-to-r from-violet-600 to-indigo-600 text-white font-black text-xs px-3 py-1.5 rounded-lg shadow-lg uppercase tracking-wide">
-                {activeCard.badge}
-              </div>
+              {/* Graphic Badge (if present) */}
+              {activeCard.badge && (
+                <div className="absolute top-3 left-3 bg-gradient-to-r from-violet-600 to-indigo-600 text-white font-black text-xs px-3 py-1.5 rounded-lg shadow-lg uppercase tracking-wide">
+                  {activeCard.badge}
+                </div>
+              )}
 
-              {/* Uzum 1-day express delivery badge */}
+              {/* Delivery badge */}
               <div className="absolute bottom-3 right-3 bg-slate-950/85 backdrop-blur-sm text-emerald-400 text-xs font-semibold px-2.5 py-1 rounded-lg border border-emerald-500/30">
-                ⚡️ 1 kunda yetkazish
+                ⚡️ Tezkor yetkazish
               </div>
 
               <div className="absolute bottom-3 left-3 bg-slate-950/80 backdrop-blur-sm text-slate-300 text-[11px] px-2.5 py-1 rounded-lg">
@@ -206,16 +201,12 @@ export const MarketplacePreview: React.FC<MarketplacePreviewProps> = ({
               </div>
 
               <h1 className="text-xl sm:text-2xl font-bold text-white leading-snug">
-                {isUzum
-                  ? lang === 'uz'
-                    ? product.uzum_title_uz
-                    : product.uzum_title_ru
-                  : product.wildberries_title_ru}
+                {lang === 'uz' ? product.uzum_title_uz : product.uzum_title_ru}
               </h1>
 
               <div className="flex items-center gap-2 pt-1 text-xs text-slate-400">
                 <span>Yetkazib beruvchi:</span>
-                <span className="text-indigo-400 font-semibold">Toshkent Express Store</span>
+                <span className="text-indigo-400 font-semibold">Premium Store</span>
                 <span className="text-slate-500">|</span>
                 <span>Kategoriya:</span>
                 <span className="text-slate-300">{product.category}</span>
@@ -226,33 +217,31 @@ export const MarketplacePreview: React.FC<MarketplacePreviewProps> = ({
             <div className="p-4 rounded-2xl bg-slate-900/90 border border-slate-800 space-y-3">
               <div className="flex items-baseline gap-3">
                 <span className="text-2xl sm:text-3xl font-extrabold font-mono text-white">
-                  {priceUzs.toLocaleString('uz-UZ')} {isUzum ? "so'm" : 'сум'}
+                  {priceUzs.toLocaleString('uz-UZ')} {lang === 'uz' ? "so'm" : 'сум'}
                 </span>
                 <span className="text-sm font-mono text-slate-500 line-through">
-                  {Math.round(priceUzs * 1.35).toLocaleString('uz-UZ')} {isUzum ? "so'm" : 'сум'}
+                  {Math.round(priceUzs * 1.35).toLocaleString('uz-UZ')} {lang === 'uz' ? "so'm" : 'сум'}
                 </span>
                 <span className="text-xs font-bold text-rose-400 bg-rose-500/10 px-2 py-0.5 rounded-md">
                   -26%
                 </span>
               </div>
 
-              {/* Uzum Nasiya installment callout */}
-              {isUzum && (
-                <div className="flex items-center justify-between p-2.5 rounded-xl bg-violet-950/40 border border-violet-800/40 text-xs">
-                  <span className="text-violet-200">
-                    <b>Uzum Nasiya:</b> oyiga {monthlyNasiya.toLocaleString('uz-UZ')} so'mdan
-                  </span>
-                  <span className="text-[11px] text-violet-400 font-semibold cursor-pointer hover:underline">
-                    Muddatli to'lov 12 oy
-                  </span>
-                </div>
-              )}
+              {/* Installment callout */}
+              <div className="flex items-center justify-between p-2.5 rounded-xl bg-violet-950/40 border border-violet-800/40 text-xs">
+                <span className="text-violet-200">
+                  <b>Bo'lib to'lash:</b> oyiga {monthlyNasiya.toLocaleString('uz-UZ')} so'mdan
+                </span>
+                <span className="text-[11px] text-violet-400 font-semibold cursor-pointer hover:underline">
+                  Muddatli to'lov 12 oy
+                </span>
+              </div>
 
               {/* Delivery guarantee */}
               <div className="flex items-center gap-2 text-xs text-slate-300 pt-1">
                 <Truck className="w-4 h-4 text-emerald-400" />
                 <span>
-                  <b>Yetkazib berish:</b> Ertaga, 12-oktyabr (Uzum topshirish punktiga bepul)
+                  <b>Yetkazib berish:</b> 1-2 kunda manzilga bepul va xavfsiz yetkaziladi
                 </span>
               </div>
             </div>
@@ -260,15 +249,11 @@ export const MarketplacePreview: React.FC<MarketplacePreviewProps> = ({
             {/* Selling Bullet Points */}
             <div className="space-y-3">
               <h3 className="text-sm font-bold text-slate-200">
-                {isUzum
-                  ? lang === 'uz'
-                    ? 'Mahsulotning afzalliklari:'
-                    : 'Преимущества товара:'
-                  : 'Особенности и преимущества:'}
+                {lang === 'uz' ? 'Mahsulotning afzalliklari:' : 'Преимущества товара:'}
               </h3>
 
               <div className="space-y-2 text-xs sm:text-sm text-slate-300">
-                {(isUzum && lang === 'uz'
+                {(lang === 'uz'
                   ? product.bullet_points_uz
                   : product.bullet_points_ru
                 ).map((bullet, idx) => (
@@ -312,7 +297,7 @@ export const MarketplacePreview: React.FC<MarketplacePreviewProps> = ({
             {/* Search Tags */}
             <div className="pt-2 text-xs text-slate-400">
               <span className="font-semibold text-slate-300">SEO Kalit so'zlar: </span>
-              {(isUzum && lang === 'uz' ? product.seo_tags_uz : product.seo_tags_ru).join(' ')}
+              {(lang === 'uz' ? product.seo_tags_uz : product.seo_tags_ru).join(' ')}
             </div>
           </div>
         </div>

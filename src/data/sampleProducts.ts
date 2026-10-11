@@ -49,40 +49,40 @@ export const SAMPLE_PRODUCTS: SampleProductItem[] = [
       materials: ["Tabiiy Rishton qizil loyi", "Ishqoriy mineral sir", "Qo'l mehnati"],
       shape_and_form: "Klassik shar shakli, qulay ergonomik tutqich va tomchilamaydigan naycha",
       key_features: [
-        "100% qo'l mehnati bilan ishlangan betakror Rishton naqshlari",
+        "100% qo'l mehnati bilan ishlangan betakror milliy naqshlar",
         "Choy damlanganda xushbo'ylik va haroratni 2 soatgacha saqlaydi",
         "Ekologik toza va xavfsiz tabiiy minerallardan olingan bo'yoqlar",
         "Har qanday bayramona dasturxonga sharqona fayz bag'ishlaydi"
       ],
       target_audience: "Oila bekalari, milliy qadriyatlar ixlosmandlari, esdalik sovg'a izlovchilar",
       suggested_price_uzs: 185000,
-      uzum_title_uz: "Keramik choynak Rishton kulolchiligi, choy damlash uchun milliy sovg'a 1000ml — Uzum Market",
-      uzum_title_ru: "Заварочный чайник керамический Риштан 1000мл ручная роспись — Доставка 1 день Uzum",
-      wildberries_title_ru: "Заварочный чайник керамический большой для чая посуда узбекская",
+      uzum_title_uz: "Keramik choynak Rishton kulolchiligi, choy damlash uchun milliy sovg'a (1000ml)",
+      uzum_title_ru: "Заварочный чайник керамический Риштан 1000мл ручная роспись",
+      wildberries_title_ru: "Заварочный чайник керамический большой для чая посуда",
       bullet_points_uz: [
-        "🫖 100% haqiqiy Rishton kulolchilik ustasi qo'l mehnati",
+        "🫖 100% haqiqiy kulolchilik ustasi qo'l mehnati",
         "🌿 Xavfsiz va tabiiy bo'yoqlar — choyning ta'mi va xushbo'yligini buzmaydi",
         "💎 Qalin keramik devorlar choy barglarini to'liq damlaydi",
         "🎁 Ehtiyotkorlik bilan xavfsiz qadoqlangan holda yetkaziladi",
-        "⚡️ Uzum orqali butun O'zbekiston bo'ylab 1 kunda yetkazib berish"
+        "⚡️ Butun hudud bo'ylab tezkor va xavfsiz yetkazib berish kafolati"
       ],
       bullet_points_ru: [
-        "🫖 Настоящая узбекская керамика ручной работы из Риштана",
+        "🫖 Настоящая керамика ручной работы с традиционной росписью",
         "🌿 Экологичные минеральные глазури без вредных примесей",
         "💎 Толстые стенки долго сохраняют тепло и раскрывают аромат чая",
         "🎁 Надежная ударопрочная упаковка — доедет в целости",
-        "⚡️ Экспресс доставка за 1 день по всему Узбекистану"
+        "⚡️ Быстрая экспресс доставка по всем регионам"
       ],
-      seo_tags_uz: ["#uzum", "#choynak", "#rishton", "#milliy", "#idish", "#oshxona", "#sovga"],
-      seo_tags_ru: ["#посуда", "#чайник", "#узбекистан", "#вайлдберриз", "#керамика", "#ручнаяработа"],
-      infographic_badges: ["100% QO'L MEHNATI", "RISHTON LOYI", "ISSIQ SAQLAYDI", "EKOLOGIK TOZA", "1 KUNDA YETKAZISH"]
+      seo_tags_uz: ["#choynak", "#rishton", "#milliy", "#idish", "#oshxona", "#sovga", "#sifatli"],
+      seo_tags_ru: ["#посуда", "#чайник", "#подарок", "#керамика", "#ручнаяработа", "#кухня"],
+      infographic_badges: ["100% QO'L MEHNATI", "RISHTON LOYI", "ISSIQ SAQLAYDI", "EKOLOGIK TOZA", "TOP SIFAT"]
     },
     studioCards: [
       {
         id: 'c1',
         index: 1,
         styleName: "Travertin Tosh Poydevor (Hero)",
-        badge: "UZUM TOP SOTUV",
+        badge: "TOP SIFAT",
         imageUrl: 'https://images.unsplash.com/photo-1576092768241-dec231879fc3?auto=format&fit=crop&w=900&q=80',
         aspectRatio: '3:4',
         description: 'Minimalist tabiiy travertin poydevor, ertalabki yumshoq quyosh nurlari va tiniq soyalar.'
@@ -109,7 +109,7 @@ export const SAMPLE_PRODUCTS: SampleProductItem[] = [
         id: 'c4',
         index: 4,
         styleName: "Infografika Uchun Toza Fon",
-        badge: "1 KUNDA YETKAZISH",
+        badge: "ORIGINAL MAHSULOT",
         imageUrl: 'https://images.unsplash.com/photo-1526170375885-4d8ecf77b99f?auto=format&fit=crop&w=900&q=80',
         aspectRatio: '3:4',
         description: 'Sotuvchi matnlari, chegirma va afzallik piktogrammalari uchun keng neytral maydon.'
@@ -146,15 +146,15 @@ export const SAMPLE_PRODUCTS: SampleProductItem[] = [
       ],
       target_audience: "Sportchilar, talabalar, haydovchilar, musiqa ixlosmandlari",
       suggested_price_uzs: 230000,
-      uzum_title_uz: "Simsiz quloqchinlar Bluetooth TWS Pro, mikrofon va shovqinni bekor qilish bilan — Uzum Market",
-      uzum_title_ru: "Беспроводные наушники Bluetooth TWS Pro с шумоподавлением и микрофоном — Доставка 1 день",
-      wildberries_title_ru: "Наушники беспроводные блютуз с микрофоном для телефона айфон андроид",
+      uzum_title_uz: "Simsiz quloqchinlar Bluetooth TWS Pro, mikrofon va shovqinni bekor qilish bilan",
+      uzum_title_ru: "Беспроводные наушники Bluetooth TWS Pro с шумоподавлением и микрофоном",
+      wildberries_title_ru: "Наушники беспроводные блютуз с микрофоном для телефона",
       bullet_points_uz: [
         "🎧 Kristaldek toza stereo ovoz va chuqur Bass chastotalari",
         "🔋 36 soat avtonom quvvat — kun bo'yi zaryad haqida o'ylamang",
         "📞 Gaplashish uchun 4 ta shovqinsiz sezgir mikrofon",
         "⚡️ Qulay sensorli boshqaruv va bir zumda ulanish",
-        "🛡 6 oylik kafolat va servis xizmati"
+        "🛡 6 oylik rasmiy kafolat va servis xizmati"
       ],
       bullet_points_ru: [
         "🎧 Мощный стереозвук с глубоким басом Hi-Fi",
@@ -163,8 +163,8 @@ export const SAMPLE_PRODUCTS: SampleProductItem[] = [
         "⚡️ Мгновенное автосопряжение с iOS и Android",
         "🛡 Официальная гарантия 6 месяцев"
       ],
-      seo_tags_uz: ["#uzummarket", "#quloqchin", "#bluetooth", "#audio", "#elektronika", "#arzon"],
-      seo_tags_ru: ["#наушники", "#вайлдберриз", "#электроника", "#подарокпарню", "#bluetooth", "#топ"],
+      seo_tags_uz: ["#quloqchin", "#bluetooth", "#audio", "#elektronika", "#arzon", "#sifatli"],
+      seo_tags_ru: ["#наушники", "#блютуз", "#электроника", "#гарнитура", "#bluetooth", "#звук"],
       infographic_badges: ["BLUETOOTH 5.3", "36 SOAT QUVVAT", "ANC SHOVQINSIZ", "HI-FI STEREO", "KAFOLAT 6 OY"]
     },
     studioCards: [
@@ -236,26 +236,26 @@ export const SAMPLE_PRODUCTS: SampleProductItem[] = [
       ],
       target_audience: "Ayollar 18-50 yosh, go'zallik salonlari, yuz parvarishiga e'tiborli xaridorlar",
       suggested_price_uzs: 145000,
-      uzum_title_uz: "Yuz uchun zardob va serum namlovchi, gialuron kislotasi bilan, 30ml — Uzum 1 kunda yetkazish",
-      uzum_title_ru: "Сыворотка для лица увлажняющая с гиалуроновой кислотой 30мл — Быстрая доставка Uzum",
+      uzum_title_uz: "Yuz uchun zardob va serum namlovchi, gialuron kislotasi bilan (30ml)",
+      uzum_title_ru: "Сыворотка для лица увлажняющая с гиалуроновой кислотой (30мл)",
       wildberries_title_ru: "Сыворотка для лица антивозрастная увлажняющая уходовая косметика",
       bullet_points_uz: [
         "💧 Chuqur namlantirish: gialuron kislotasi terining chuqur qatlamlarigacha singadi",
         "✨ Qizarish va toshmalarni kamaytiradi, ohangni bir tekis qiladi",
         "🌿 100% tabiiy ekstraktlar va xavfsiz dermatologik formula",
-        "⚡️ Uzum Market orqali ertagayoq qabul qilib olish imkoniyati",
-        "🛡 O'zbekiston standartlari bo'yicha to'liq sertifikatlangan"
+        "⚡️ Qulay shisha flakon va tejamkor pipetka dispenseri",
+        "🛡 Xalqaro dermatologik xavfsizlik standartlariga to'liq javob beradi"
       ],
       bullet_points_ru: [
         "💧 Глубокое увлажнение и удержание влаги до 24 часов",
         "✨ Сияние и ровный тон кожи без липкого эффекта",
         "🌿 Натуральный состав без парабенов и сульфатов",
-        "⚡️ Экспресс-доставка Uzum по Узбекистану за 1 день",
+        "⚡️ Удобная стеклянная пипетка для точного нанесения",
         "🛡 100% оригинальная продукция с гарантией качества"
       ],
-      seo_tags_uz: ["#uzum", "#kosmetika", "#serum", "#yuzparvarishi", "#gozallik", "#toshkent"],
-      seo_tags_ru: ["#вайлдберриз", "#уходзалицом", "#сыворотка", "#косметика", "#хитпродаж", "#узбекистан"],
-      infographic_badges: ["100% TABIIY TARKIB", "GIPOALLERGEN", "TEZ SO'RILADI", "TOP SOTUVDA", "1 KUNDA YETKAZISH"]
+      seo_tags_uz: ["#kosmetika", "#serum", "#yuzparvarishi", "#gozallik", "#toshkent", "#namlovchi"],
+      seo_tags_ru: ["#уходзалицом", "#сыворотка", "#косметика", "#хитпродаж", "#красота", "#увлажнение"],
+      infographic_badges: ["100% TABIIY TARKIB", "GIPOALLERGEN", "TEZ SO'RILADI", "TOP SOTUVDA", "PREMIUM SIFAT"]
     },
     studioCards: [
       {
@@ -288,8 +288,8 @@ export const SAMPLE_PRODUCTS: SampleProductItem[] = [
       {
         id: 's4',
         index: 4,
-        styleName: "Uzum Sotuvchi Hero Kartochkasi",
-        badge: "1 KUNDA YETKAZISH",
+        styleName: "E-Commerce Hero Kartochkasi",
+        badge: "PREMIUM SIFAT",
         imageUrl: 'https://images.unsplash.com/photo-1556228720-195a672e8a03?auto=format&fit=crop&w=900&q=80',
         aspectRatio: '3:4',
         description: 'Infografika va afzalliklar joylashtirish uchun ochiq pastel fon.'

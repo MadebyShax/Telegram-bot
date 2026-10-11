@@ -10,7 +10,7 @@ pinned: false
 
 # 🛍️ EcommerceAICardBot
 
-**Zero-prompt AI product card generator Telegram bot for Uzum Market, Wildberries, and Instagram sellers in Uzbekistan.**
+**Zero-prompt AI product card generator Telegram bot for e-commerce and online sellers.**
 Powered by **Google AI Studio (Gemini 2.5 Flash)**, **Aiogram 3.x**, and **Click / Payme Telegram Native Payments**.
 
 ---

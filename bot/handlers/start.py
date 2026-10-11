@@ -57,7 +57,7 @@ async def handle_start(message: types.Message, session: AsyncSession):
         welcome_text = (
             f"Assalomu alaykum, <b>{full_name}</b>!\n\n"
             "⚡️ <b>Zero-Prompt E-Commerce AI Botiga xush kelibsiz!</b>\n"
-            "Uzum Market, Wildberries va Instagram uchun professional studiya kartochkalari generatori.\n\n"
+            "E-Commerce va online savdo uchun professional studiya kartochkalari generatori.\n\n"
             "🎁 <b>Xush kelibsiz bonusi:</b>\n"
             "Pastdagi tugmani bosib, telefon raqamingizni tasdiqlang va darhol <b>1 ta bepul paket (5 ta studiya kartochkasi + to'liq SEO tavsif)</b> ga ega bo'ling!"
         )
@@ -182,7 +182,7 @@ async def handle_how_it_works(callback: types.CallbackQuery):
         "   • Hashamatli qorong'u vitrina\n"
         "   • Infografika uchun qulay oq fon\n"
         "   • Makro detallar va sifat fokus\n"
-        "4. Uzum va Wildberries qoidalariga to'liq mos keladigan SEO sarlavha va kalit so'zlarni olasiz.\n\n"
+        "4. Savdo platformalari talablariga mos keladigan professional SEO sarlavha va kalit so'zlarni olasiz.\n\n"
         "📊 <b>Prezentatsiya rejimi (NotebookLM uslubi):</b>\n"
         "Mahsulot rasmidan hech qanday ortiqcha so'zsiz 5 ta vizual taqdimot slaydlari (Pitch Deck) yaratib olish imkoniyati!"
     )

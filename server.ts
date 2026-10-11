@@ -79,15 +79,15 @@ ${productNameHint ? `Product context hint: ${productNameHint}` : ''}
             shape_and_form: { type: Type.STRING, description: "Shakl va konstruksiya" },
             key_features: { type: Type.ARRAY, items: { type: Type.STRING }, description: "4-5 ta asosiy xususiyat" },
             target_audience: { type: Type.STRING, description: "Xaridorlar auditoriyasi" },
-            suggested_price_uzs: { type: Type.NUMBER, description: "Tavsiya etilgan bozor narxi UZS da" },
-            uzum_title_uz: { type: Type.STRING, description: "Uzum Market uchun 100 belgilik SEO sarlavha (o'zbekcha)" },
-            uzum_title_ru: { type: Type.STRING, description: "Uzum Market SEO sarlavhasi (ruscha)" },
-            wildberries_title_ru: { type: Type.STRING, description: "Wildberries SEO sarlavhasi (ruscha)" },
+            suggested_price_uzs: { type: Type.NUMBER, description: "Tavsiya etilgan narx UZS da" },
+            uzum_title_uz: { type: Type.STRING, description: "Sotuvchi SEO sarlavha (o'zbekcha, NO marketplace names)" },
+            uzum_title_ru: { type: Type.STRING, description: "SEO заголовок (русский, NO marketplace names)" },
+            wildberries_title_ru: { type: Type.STRING, description: "Товарный заголовок (русский, NO marketplace names)" },
             bullet_points_uz: { type: Type.ARRAY, items: { type: Type.STRING }, description: "5 ta sotuvchi afzalliklar (o'zbekcha)" },
-            bullet_points_ru: { type: Type.ARRAY, items: { type: Type.STRING }, description: "5 продающих буллетов (русский)" },
+            bullet_points_ru: { type: Type.ARRAY, items: { type: Type.STRING }, description: "5 продающих преимуществ (русский)" },
             seo_tags_uz: { type: Type.ARRAY, items: { type: Type.STRING }, description: "SEO xeshteglar o'zbekcha" },
             seo_tags_ru: { type: Type.ARRAY, items: { type: Type.STRING }, description: "SEO теги русский" },
-            infographic_badges: { type: Type.ARRAY, items: { type: Type.STRING }, description: "Kartochkalar uchun 5 ta infografika yozuvi" },
+            infographic_badges: { type: Type.ARRAY, items: { type: Type.STRING }, description: "Kartochkalar uchun 5 ta mahsulot xususiyati infografika yozuvi (NO marketplace names)" },
           },
           required: [
             "product_name_uz",
@@ -146,26 +146,26 @@ function getCuratedFallback(hint?: string) {
       ],
       target_audience: "Ayollar 18-50 yosh, go'zallik salonlari, yuz parvarishiga e'tiborli xaridorlar",
       suggested_price_uzs: 145000,
-      uzum_title_uz: "Yuz uchun zardob va serum namlovchi, gialuron kislotasi bilan, 30ml — Uzum 1 kunda yetkazish",
-      uzum_title_ru: "Сыворотка для лица увлажняющая с гиалуроновой кислотой 30мл — Быстрая доставка Uzum",
+      uzum_title_uz: "Yuz uchun zardob va serum namlovchi, gialuron kislotasi bilan (30ml)",
+      uzum_title_ru: "Сыворотка для лица увлажняющая с гиалуроновой кислотой (30мл)",
       wildberries_title_ru: "Сыворотка для лица антивозрастная увлажняющая уходовая косметика",
       bullet_points_uz: [
         "💧 Chuqur namlantirish: gialuron kislotasi terining chuqur qatlamlarigacha singadi",
         "✨ Qizarish va toshmalarni kamaytiradi, ohangni bir tekis qiladi",
         "🌿 100% tabiiy ekstraktlar va xavfsiz dermatologik formula",
-        "⚡️ Uzum Market orqali ertagayoq qabul qilib olish imkoniyati",
-        "🛡 O'zbekiston standartlari bo'yicha to'liq sertifikatlangan"
+        "⚡️ Qulay shisha flakon va tejamkor pipetka dispenseri",
+        "🛡 Xalqaro standartlar bo'yicha to'liq sertifikatlangan"
       ],
       bullet_points_ru: [
         "💧 Глубокое увлажнение и удержание влаги до 24 часов",
         "✨ Сияние и ровный тон кожи без липкого эффекта",
         "🌿 Натуральный состав без парабенов и сульфатов",
-        "⚡️ Экспресс-доставка Uzum по Узбекистану за 1 день",
+        "⚡️ Удобная стеклянная пипетка для точного нанесения",
         "🛡 100% оригинальная продукция с гарантией качества"
       ],
-      seo_tags_uz: ["#uzum", "#kosmetika", "#serum", "#yuzparvarishi", "#gozallik", "#toshkent"],
-      seo_tags_ru: ["#вайлдберриз", "#уходзалицом", "#сыворотка", "#косметика", "#хитпродаж", "#узбекистан"],
-      infographic_badges: ["100% TABIIY TARKIB", "GIPOALLERGEN", "TEZ SO'RILADI", "TOP SOTUVDA", "1 KUNDA YETKAZISH"]
+      seo_tags_uz: ["#kosmetika", "#serum", "#yuzparvarishi", "#gozallik", "#toshkent"],
+      seo_tags_ru: ["#уходзалицом", "#сыворотка", "#косметика", "#хитпродаж", "#красота"],
+      infographic_badges: ["100% TABIIY TARKIB", "GIPOALLERGEN", "TEZ SO'RILADI", "TOP SOTUVDA", "PREMIUM SIFAT"]
     };
   }
 
@@ -185,15 +185,15 @@ function getCuratedFallback(hint?: string) {
       ],
       target_audience: "Sportchilar, talabalar, haydovchilar, musiqa ixlosmandlari",
       suggested_price_uzs: 230000,
-      uzum_title_uz: "Simsiz quloqchinlar Bluetooth TWS Pro, mikrofon va shovqinni bekor qilish bilan — Uzum Market",
-      uzum_title_ru: "Беспроводные наушники Bluetooth TWS Pro с шумоподавлением и микрофоном — Доставка 1 день",
-      wildberries_title_ru: "Наушники беспроводные блютуз с микрофоном для телефона айфон андроид",
+      uzum_title_uz: "Simsiz quloqchinlar Bluetooth TWS Pro, mikrofon va shovqinni bekor qilish bilan",
+      uzum_title_ru: "Беспроводные наушники Bluetooth TWS Pro с шумоподавлением и микрофоном",
+      wildberries_title_ru: "Наушники беспроводные блютуз с микрофоном для телефона",
       bullet_points_uz: [
         "🎧 Kristaldek toza stereo ovoz va chuqur Bass chastotalari",
         "🔋 36 soat avtonom quvvat — kun bo'yi zaryad haqida o'ylamang",
         "📞 Gaplashish uchun 4 ta shovqinsiz sezgir mikrofon",
         "⚡️ Qulay sensorli boshqaruv va bir zumda ulanish",
-        "🛡 6 oylik kafolat va servis xizmati"
+        "🛡 6 oylik rasmiy kafolat va servis xizmati"
       ],
       bullet_points_ru: [
         "🎧 Мощный стереозвук с глубоким басом Hi-Fi",
@@ -202,48 +202,48 @@ function getCuratedFallback(hint?: string) {
         "⚡️ Мгновенное автосопряжение с iOS и Android",
         "🛡 Официальная гарантия 6 месяцев"
       ],
-      seo_tags_uz: ["#uzummarket", "#quloqchin", "#bluetooth", "#audio", "#elektronika", "#arzon"],
-      seo_tags_ru: ["#наушники", "#вайлдберриз", "#электроника", "#подарокпарню", "#bluetooth", "#топ"],
+      seo_tags_uz: ["#quloqchin", "#bluetooth", "#audio", "#elektronika", "#arzon", "#sifatli"],
+      seo_tags_ru: ["#наушники", "#блютуз", "#электроника", "#гарнитура", "#bluetooth", "#топ"],
       infographic_badges: ["BLUETOOTH 5.3", "36 SOAT QUVVAT", "ANC SHOVQINSIZ", "HI-FI STEREO", "KAFOLAT 6 OY"]
     };
   }
 
-  // Default: Handmade Uzbek Ceramic Teapot / Kitchenware
+  // Default: Handmade Ceramic Teapot / Kitchenware
   return {
-    product_name_uz: "Rishton Kulolchiligi Klassik Keramik Choynak (1 Litr)",
-    product_name_ru: "Риштанский керамический заварочный чайник ручной работы (1 литр)",
+    product_name_uz: "Klassik Keramik Choynak (1 Litr)",
+    product_name_ru: "Керамический заварочный чайник ручной работы (1 литр)",
     category: "Oshxona anjomlari / Choynak va chashkalar",
     primary_colors: ["Moviy lazur", "Turkuaz naqsh", "Oq sir"],
-    materials: ["Tabiiy Rishton loyi", "Ishqoriy sir (Ishkor)", "Qo'l mehnati naqshlari"],
-    shape_and_form: "Klassik an'anaviy shar shaklidagi choynak, nafis naycha va mustahkam qopqoq bilan",
+    materials: ["Tabiiy loy", "Ishqoriy sir", "Qo'l mehnati naqshlari"],
+    shape_and_form: "Klassik shar shaklidagi choynak, nafis naycha va mustahkam qopqoq bilan",
     key_features: [
-      "100% qo'l mehnati bilan tayyorlangan Rishton milliy naqshlari",
+      "100% qo'l mehnati bilan tayyorlangan nafis naqshlar",
       "Ekologik toza va xavfsiz an'anaviy ishqoriy sir",
       "Choyni uzoq vaqt qaynoq saqlovchi qalin tabiiy keramik devor",
-      "Stolda o'zgacha sharqona fayz va bayramona kayfiyat yaratadi"
+      "Stolda o'zgacha fayz va bayramona kayfiyat yaratadi"
     ],
-    target_audience: "Oila bekalari, milliy buyumlar shinavandalari, xorijiy mehmonlarga esdalik sovg'a izlovchilar",
+    target_audience: "Oila bekalari, milliy buyumlar shinavandalari, esdalik sovg'a izlovchilar",
     suggested_price_uzs: 180000,
-    uzum_title_uz: "Keramik choynak Rishton kulolchiligi, choy damlash uchun milliy sovg'a 1000ml — Uzum Market",
-    uzum_title_ru: "Заварочный чайник керамический Риштан 1000мл ручная роспись — Доставка 1 день Uzum",
-    wildberries_title_ru: "Заварочный чайник керамический большой для чая посуда узбекская",
+    uzum_title_uz: "Keramik choynak kulolchiligi, choy damlash uchun nafis sovg'a (1000ml)",
+    uzum_title_ru: "Заварочный чайник керамический 1000мл ручная роспись",
+    wildberries_title_ru: "Заварочный чайник керамический большой для чая посуда",
     bullet_points_uz: [
-      "🫖 100% haqiqiy Rishton kulolchilik ustasi qo'l mehnati",
+      "🫖 100% haqiqiy kulolchilik ustasi qo'l mehnati",
       "🌿 Xavfsiz va tabiiy bo'yoqlar — choyning ta'mi va xushbo'yligini buzmaydi",
       "💎 Issiqlikni uzoq saqlab, choy barglarini mukammal damlaydi",
       "🎁 Qutida ehtiyotkorlik bilan xavfsiz qadoqlangan holda yetkaziladi",
-      "⚡️ Uzum orqali butun O'zbekiston bo'ylab 1 kunda yetkazib berish"
+      "⚡️ Butun hudud bo'ylab tezkor va xavfsiz yetkazib berish"
     ],
     bullet_points_ru: [
-      "🫖 Настоящая узбекская керамика ручной работы из Риштана",
+      "🫖 Настоящая керамика ручной работы",
       "🌿 Экологичные минеральные глазури без вредных примесей",
       "💎 Толстые стенки долго сохраняют тепло и раскрывают аромат чая",
       "🎁 Надежная ударопрочная упаковка — доедет в целости",
-      "⚡️ Экспресс доставка за 1 день по всему Узбекистану"
+      "⚡️ Экспресс доставка в защитной упаковке"
     ],
-    seo_tags_uz: ["#uzum", "#choynak", "#rishton", "#milliy", "#idish", "#oshxona", "#sovga"],
-    seo_tags_ru: ["#посуда", "#чайник", "#узбекистан", "#вайлдберриз", "#керамика", "#ручнаяработа"],
-    infographic_badges: ["100% QO'L MEHNATI", "RISHTON LOYI", "ISSIQ SAQLAYDI", "EKOLOGIK TOZA", "1 KUNDA YETKAZISH"]
+    seo_tags_uz: ["#choynak", "#milliy", "#idish", "#oshxona", "#sovga", "#sifatli"],
+    seo_tags_ru: ["#посуда", "#чайник", "#подарок", "#керамика", "#ручнаяработа"],
+    infographic_badges: ["100% QO'L MEHNATI", "TABIIY LOY", "ISSIQ SAQLAYDI", "EKOLOGIK TOZA", "TOP SIFAT"]
   };
 }
 
