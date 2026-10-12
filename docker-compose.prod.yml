@@ -1,0 +1,11 @@
+# Production: runs ONLY the bot container.
+# The database is external (Supabase), configured via DATABASE_URL in .env.
+# Usage on the server:
+#   docker compose -f docker-compose.prod.yml up -d --build
+services:
+  bot:
+    build: .
+    container_name: ecommerce_ai_card_bot
+    restart: unless-stopped
+    env_file:
+      - .env
