@@ -5,31 +5,13 @@ Hugging Face Spaces requires an active HTTP server on port 7860 to keep the Spac
 """
 
 import os
-import sys
 import asyncio
 import logging
 from aiohttp import web
-from aiogram import Bot, Dispatcher
-from aiogram.enums import ParseMode
-from aiogram.client.default import DefaultBotProperties
 
-from config import settings
-from database.db import init_db
-from bot.main import DependencyInjectionMiddleware
-from bot.handlers import setup_handlers
-from services.vision_service import VisionService
-from services.seo_service import SeoService
-from services.image_gen_service import ImageGenService
-from services.payment_service import PaymentService
-from services.presentation_service import PresentationService
-from services.google_ai_studio_service import GoogleAIStudioService
+from bot.main import create_bot_and_dispatcher, setup_logging
 
-# Configure logging
-logging.basicConfig(
-    level=logging.INFO,
-    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
-    handlers=[logging.StreamHandler(sys.stdout)]
-)
+setup_logging()
 logger = logging.getLogger("HF-EcommerceAICardBot")
 
 # Hugging Face default port is 7860
@@ -57,7 +39,7 @@ async def health_check(request: web.Request) -> web.Response:
         <div class="card">
             <span class="badge">● Bot Active & Running</span>
             <h1>EcommerceAICardBot</h1>
-            <p>Zero-prompt AI product card generator for Uzum Market & Wildberries in Uzbekistan.<br>Powered by <b>Google AI Studio (Gemini 2.5 Flash)</b> and <b>Aiogram 3.x</b>.</p>
+            <p>Zero-prompt AI product card generator for online sellers in Uzbekistan.<br>Powered by <b>Google AI Studio (Gemini)</b> and <b>Aiogram 3.x</b>.</p>
             <div class="info-box">
                 <div>⚡️ Host: Hugging Face Spaces</div>
                 <div>📡 Port: 7860</div>
@@ -69,41 +51,6 @@ async def health_check(request: web.Request) -> web.Response:
     </html>
     """
     return web.Response(text=html_content, content_type="text/html")
-
-
-async def start_telegram_bot() -> tuple[Bot, Dispatcher]:
-    """Initializes and configures the Aiogram 3.x Telegram bot."""
-    try:
-        await init_db()
-        logger.info("Database schema initialized.")
-    except Exception as e:
-        logger.warning(f"Database connection note: {e}")
-
-    bot = Bot(
-        token=settings.BOT_TOKEN,
-        default=DefaultBotProperties(parse_mode=ParseMode.HTML)
-    )
-    dp = Dispatcher()
-
-    vision_service = VisionService()
-    seo_service = SeoService()
-    image_gen_service = ImageGenService()
-    payment_service = PaymentService(bot=bot)
-    presentation_service = PresentationService()
-    google_ai_service = GoogleAIStudioService()
-
-    middleware = DependencyInjectionMiddleware(
-        vision_service=vision_service,
-        seo_service=seo_service,
-        image_gen_service=image_gen_service,
-        payment_service=payment_service,
-        presentation_service=presentation_service,
-        google_ai_service=google_ai_service
-    )
-    dp.update.middleware(middleware)
-    dp.include_router(setup_handlers())
-
-    return bot, dp
 
 
 async def main():
@@ -121,7 +68,7 @@ async def main():
     logger.info(f"Hugging Face HTTP Health Server successfully listening on http://0.0.0.0:{HF_PORT}")
 
     # 2. Start Telegram Bot polling in the same async loop
-    bot, dp = await start_telegram_bot()
+    bot, dp = await create_bot_and_dispatcher()
     logger.info("Telegram Bot Polling started (Zero-Prompt listener online)...")
 
     try:

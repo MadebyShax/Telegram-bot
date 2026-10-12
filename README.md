@@ -32,6 +32,12 @@ In your Hugging Face Space settings (**Settings > Variables and secrets > New se
 * `PAYME_PROVIDER_TOKEN`: Payme payment token (from `@BotFather` -> Payments)
 * `DATABASE_URL`: Your PostgreSQL / Supabase connection URL (e.g. `postgresql+asyncpg://postgres:...@...supabase.co:5432/postgres`)
 
+Optional variables:
+* `GEMINI_IMAGE_MODEL`: Gemini image model that turns the seller's photo into studio cards (default `gemini-2.5-flash-image`; check its quota/pricing for your key in Google AI Studio)
+* `IMAGE_GEN_CONCURRENCY`: how many cards are generated in parallel (default `2`)
+
+See `.env.example` for the full list.
+
 ### 3. Push Code to Hugging Face
 ```bash
 git remote add space https://huggingface.co/spaces/YOUR_USERNAME/EcommerceAICardBot

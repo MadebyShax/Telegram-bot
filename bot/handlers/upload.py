@@ -1,255 +1,274 @@
+import html
 import io
 import logging
-from typing import Optional
+import uuid
 from aiogram import Router, types, F, Bot
+from aiogram.types import BufferedInputFile
 from aiogram.utils.keyboard import InlineKeyboardBuilder
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select
+from sqlalchemy import select, update
 from database.models import User, CardGeneration
-from services.vision_service import VisionService
-from services.seo_service import SeoService
-from services.image_gen_service import ImageGenService
-from services.google_ai_studio_service import GoogleAIStudioService
+from services.google_ai_studio_service import GoogleAIStudioService, GoogleAIServiceError
+from bot.handlers.payment import payment_keyboard
+from bot.i18n import t
 from config import settings
 
 logger = logging.getLogger(__name__)
 router = Router(name="upload")
 
-# In-memory cache for pending photo bytes and SEO data per user
-PENDING_PHOTO_UPLOADS: dict[int, bytes] = {}
-PENDING_SEO_DATA: dict[int, dict] = {}
+# Telegram file_id of the last uploaded photo per user.
+# Only the short id is kept in memory; the photo itself is downloaded again when generation starts.
+PENDING_PHOTOS: dict[int, str] = {}
+
+TELEGRAM_MESSAGE_LIMIT = 4096
+
+
+async def _reserve_credit(session: AsyncSession, user_id: int) -> bool:
+    """Atomically takes one credit. Returns False if the balance is empty (safe against double taps)."""
+    stmt = (
+        update(User)
+        .where(User.telegram_id == user_id, User.credits > 0)
+        .values(credits=User.credits - 1)
+        .returning(User.credits)
+        .execution_options(synchronize_session=False)
+    )
+    result = await session.execute(stmt)
+    reserved = result.scalar_one_or_none() is not None
+    await session.commit()
+    return reserved
+
+
+async def _refund_credit(session: AsyncSession, user_id: int):
+    stmt = (
+        update(User)
+        .where(User.telegram_id == user_id)
+        .values(credits=User.credits + 1)
+        .execution_options(synchronize_session=False)
+    )
+    await session.execute(stmt)
+    await session.commit()
 
 
 @router.message(F.photo)
-async def handle_product_photo(
-    message: types.Message,
-    bot: Bot,
-    session: AsyncSession
-):
+async def handle_product_photo(message: types.Message, session: AsyncSession, lang: str):
     """
     Zero-prompt workflow:
     User uploads raw product photo without writing anything.
     1. Verifies credits.
-    2. Downloads and caches photo in memory.
+    2. Remembers the photo's file_id.
     3. Asks user whether infographics is needed or clean photo is preferred!
     """
     user_id = message.from_user.id
 
-    # 1. Check user credits
     stmt = select(User).where(User.telegram_id == user_id)
     result = await session.execute(stmt)
     user = result.scalar_one_or_none()
 
-    if not user or user.credits <= 0:
-        builder = InlineKeyboardBuilder()
-        builder.button(text="🔵 Click (15,000 UZS)", callback_data="pay_click")
-        builder.button(text="🟢 Payme (15,000 UZS)", callback_data="pay_payme")
-        builder.adjust(2)
+    if not user:
+        await message.answer(t(lang, "need_start"), parse_mode="HTML")
+        return
 
+    if user.credits <= 0:
         await message.answer(
-            "⚠️ <b>Balansingizda generatsiya paketlari tugadi.</b>\n\n"
-            "5 ta professional e-commerce studiya kartochkasi va to'liq SEO tavsif "
-            "yaratish uchun hisobingizni to'ldiring (15,000 UZS):",
-            reply_markup=builder.as_markup(),
+            t(lang, "no_credits", cards=settings.CARDS_PER_PACKAGE, price=f"{settings.PACKAGE_PRICE_UZS:,}"),
+            reply_markup=payment_keyboard(lang, columns=2),
             parse_mode="HTML"
         )
         return
 
-    # 2. Download and cache photo
-    try:
-        highest_photo = message.photo[-1]
-        file_info = await bot.get_file(highest_photo.file_id)
-        photo_bytes_io = io.BytesIO()
-        await bot.download_file(file_info.file_path, destination=photo_bytes_io)
-        raw_image_bytes = photo_bytes_io.getvalue()
-        PENDING_PHOTO_UPLOADS[user_id] = raw_image_bytes
+    PENDING_PHOTOS[user_id] = message.photo[-1].file_id
 
-        # 3. Ask about Infographics (Infografika so'ralsin va marketlar yozuvi kerakmas)
-        builder = InlineKeyboardBuilder()
-        builder.button(text="✨ Ha, infografika bilan", callback_data=f"info_yes:{user_id}")
-        builder.button(text="📸 Yo'q, toza fotosurat", callback_data=f"info_no:{user_id}")
-        builder.adjust(1)
+    builder = InlineKeyboardBuilder()
+    builder.button(text=t(lang, "btn_info_yes"), callback_data="info_yes")
+    builder.button(text=t(lang, "btn_info_no"), callback_data="info_no")
+    builder.adjust(1)
 
-        ask_infographics_text = (
-            "📸 <b>Mahsulot surati qabul qilindi!</b>\n\n"
-            "📊 <b>Mahsulot kartochkalariga Infografika qo'shilsinmi?</b>\n\n"
-            "✨ <b>Ha, infografika bilan</b> — mahsulotning asosiy afzalliklari, xususiyatlari va vizual belgilari bilan\n"
-            "📸 <b>Yo'q, toza fotosurat</b> — hech qanday yozuv va belgilarsiz toza studiya suratlari"
-        )
-
-        await message.answer(ask_infographics_text, reply_markup=builder.as_markup(), parse_mode="HTML")
-
-    except Exception as e:
-        logger.exception(f"Error caching product photo: {e}")
-        await message.answer(
-            "❌ <b>Rasmni qabul qilishda xatolik yuz berdi.</b>\n"
-            "Iltimos, qaytadan urinib ko'ring.",
-            parse_mode="HTML"
-        )
+    await message.answer(t(lang, "photo_received"), reply_markup=builder.as_markup(), parse_mode="HTML")
 
 
-@router.callback_query(lambda c: c.data.startswith("info_yes:") or c.data.startswith("info_no:"))
+# Also matches old buttons in the format "info_yes:<user_id>"
+@router.callback_query(F.data.regexp(r"^info_(yes|no)(:\d+)?$"))
 async def handle_infographics_selection(
     callback: types.CallbackQuery,
+    bot: Bot,
     session: AsyncSession,
-    image_gen_service: ImageGenService,
-    google_ai_service: Optional[GoogleAIStudioService] = None
+    google_ai_service: GoogleAIStudioService,
+    lang: str
 ):
     """
-    Handles user choice for Infographics (Yes vs No) and proceeds to generate 5 cards.
+    Handles user choice for Infographics (Yes vs No) and generates 5 cards of the user's own product.
+    The credit is taken before generation and refunded if nothing could be generated.
     """
     user_id = callback.from_user.id
-    with_infographics = callback.data.startswith("info_yes:")
-    raw_image_bytes = PENDING_PHOTO_UPLOADS.get(user_id)
+    with_infographics = callback.data.startswith("info_yes")
 
-    if not raw_image_bytes:
-        await callback.message.answer(
-            "⚠️ Rasm sessiyasi muddati tugadi. Iltimos, mahsulot rasmini qaytadan yuboring.",
-            parse_mode="HTML"
-        )
-        await callback.answer()
+    # pop(): a second tap on the same button cannot start a second generation
+    file_id = PENDING_PHOTOS.pop(user_id, None)
+    if not file_id:
+        await callback.answer(t(lang, "session_expired"), show_alert=True)
         return
 
-    # Check credits
-    stmt = select(User).where(User.telegram_id == user_id)
-    result = await session.execute(stmt)
-    user = result.scalar_one_or_none()
-
-    if not user or user.credits <= 0:
-        await callback.answer("Balansingizda paketlar yetarli emas!", show_alert=True)
+    if not await _reserve_credit(session, user_id):
+        PENDING_PHOTOS[user_id] = file_id  # keep the photo so the user can continue right after paying
+        await callback.answer(t(lang, "not_enough_credits"), show_alert=True)
+        await callback.message.answer(t(lang, "topup_then_retry"), reply_markup=payment_keyboard(lang, columns=2))
         return
 
-    choice_text = (
-        "✨ <b>Infografika tanlandi.</b> Mahsulot afzalliklari va belgilari bilan kartochkalar tayyorlanmoqda..."
-        if with_infographics
-        else "📸 <b>Toza fotosurat tanlandi.</b> Yozuv va belgilarsiz toza studiya suratlari tayyorlanmoqda..."
-    )
-
-    status_msg = await callback.message.answer(
-        f"⏳ <b>Google AI Studio tahlil qilmoqda...</b>\n<i>{choice_text}</i>",
-        parse_mode="HTML"
-    )
     await callback.answer()
-
     try:
-        # Step 1: Google AI Studio Gemini Vision & Dynamic Cards
-        ai_service = google_ai_service or GoogleAIStudioService()
-        catalog_data = await ai_service.analyze_and_generate_cards(
-            raw_image_bytes,
-            include_infographics=with_infographics
+        await callback.message.edit_reply_markup(reply_markup=None)
+    except Exception:
+        pass  # the question message may be too old to edit
+
+    choice_text = t(lang, "choice_infographics" if with_infographics else "choice_clean")
+    status_msg = await callback.message.answer(t(lang, "working", choice=choice_text), parse_mode="HTML")
+
+    catalog_data: dict = {}
+    try:
+        file_info = await bot.get_file(file_id)
+        photo_buffer = io.BytesIO()
+        await bot.download_file(file_info.file_path, destination=photo_buffer)
+        image_bytes = photo_buffer.getvalue()
+
+        # Step 1: product analysis + SEO copy (cards can still be made if this fails)
+        try:
+            catalog_data = await google_ai_service.analyze_product(image_bytes, badge_language=lang)
+        except Exception as e:
+            logger.exception(f"Product analysis failed, generating cards without SEO: {e}")
+
+        # Step 2: the user's own product re-shot in 5 random studio scenes
+        cards = await google_ai_service.generate_studio_cards(
+            image_bytes,
+            product_name=str(catalog_data.get("product_name_en", "")),
+            badges=catalog_data.get("infographic_badges"),
+            include_infographics=with_infographics,
+            lang=lang
         )
+        if not cards:
+            raise GoogleAIServiceError("No studio cards were generated")
 
-        cards = catalog_data.get("studio_cards", [])
-        if not cards or len(cards) < 5:
-            cards = await image_gen_service.generate_5_studio_cards(catalog_data)
-
-        # Enforce clean photo if infographics is disabled
-        if not with_infographics:
-            for c in cards:
-                c["badge"] = ""
-
-        # Step 2: Deliver 5 Cards as Telegram Media Group (Album)
+        # Step 3: deliver the cards as a Telegram album
         media_group = []
         for idx, card in enumerate(cards):
-            caption = ""
+            caption = None
             if idx == 0:
-                if with_infographics and card.get("badge"):
-                    caption = f"📸 <b>Kartochka 1: {card['style']}</b>\n🏷 <i>Afzallik belgisi: {card['badge']}</i>"
-                else:
-                    caption = f"📸 <b>Kartochka 1: {card['style']}</b>\n✨ <i>Toza studiya fotosessiyasi</i>"
-
-            media_item = types.InputMediaPhoto(
-                media=card["image_url"],
+                styles = "\n".join(f"{i + 1}. {html.escape(c['style'])}" for i, c in enumerate(cards))
+                caption = t(lang, "album_caption", styles=styles)
+            media_group.append(types.InputMediaPhoto(
+                media=BufferedInputFile(card["image_bytes"], filename=f"card_{idx + 1}.png"),
                 caption=caption,
                 parse_mode="HTML" if caption else None
-            )
-            media_group.append(media_item)
+            ))
 
-        await callback.message.answer_media_group(media=media_group)
-
-        # Cache SEO data for this user
-        PENDING_SEO_DATA[user_id] = catalog_data
-
-        # Step 3: Ask user if they need the SEO copy (NO marketplace brand names!)
-        builder = InlineKeyboardBuilder()
-        builder.button(text="✅ Ha, SEO matn kerak", callback_data=f"seo_yes:{user_id}")
-        builder.button(text="❌ Yo'q, faqat kartochkalar kifoya", callback_data="seo_no")
-        builder.adjust(1)
-
-        ask_seo_text = (
-            "🎉 <b>5 ta yangi professional studiya kartochkasi tayyor!</b>\n\n"
-            "📝 <b>Mahsulot uchun professional SEO tavsifi (sarlavha, afzalliklar va qidiruv teglari) kerakmi?</b>"
-        )
-
-        await callback.message.answer(ask_seo_text, reply_markup=builder.as_markup(), parse_mode="HTML")
-
-        # Deduct credit and save database record
-        user.credits -= 1
-        record = CardGeneration(
-            user_id=user_id,
-            original_image_url="tg_user_upload",
-            product_metadata=catalog_data,
-            generated_image_urls=[c["image_url"] for c in cards],
-            cost_usd=0.024
-        )
-        session.add(record)
-        await session.commit()
-
-        # Delete progress message
-        await status_msg.delete()
+        sent_messages = await callback.message.answer_media_group(media=media_group)
 
     except Exception as e:
-        logger.exception(f"Error processing card generation: {e}")
-        await status_msg.edit_text(
-            "❌ <b>Xatolik yuz berdi.</b>\n"
-            "Iltimos, qaytadan urinib ko'ring yoki sifatliroq rasm yuboring.",
-            parse_mode="HTML"
-        )
-
-
-@router.callback_query(lambda c: c.data.startswith("seo_yes:"))
-async def handle_seo_yes(callback: types.CallbackQuery):
-    """Triggered when user clicks 'Ha, SEO matn kerak' (NO marketplace brand names)."""
-    user_id = callback.from_user.id
-    seo_data = PENDING_SEO_DATA.get(user_id)
-
-    if not seo_data:
-        await callback.message.answer(
-            "Ma'lumotlar yangilandi. Iltimos, yangi mahsulot rasmini yuboring.",
-            parse_mode="HTML"
-        )
-        await callback.answer()
+        logger.exception(f"Error processing card generation for user {user_id}: {e}")
+        await _refund_credit(session, user_id)
+        PENDING_PHOTOS[user_id] = file_id  # let the user retry with the same photo
+        await status_msg.edit_text(t(lang, "generation_failed"), parse_mode="HTML")
         return
 
-    bullets_uz = "\n".join(seo_data.get("bullet_points_uz", []))
-    bullets_ru = "\n".join(seo_data.get("bullet_points_ru", []))
-    tags_uz = " ".join(seo_data.get("seo_tags_uz", []))
-    tags_ru = " ".join(seo_data.get("seo_tags_ru", []))
+    try:
+        await status_msg.delete()
+    except Exception:
+        pass  # cards are already delivered, a leftover progress message is harmless
 
-    seo_caption = (
-        "📋 <b>Sizning mahsulotingiz uchun tayyor SEO tavsifi:</b>\n\n"
-        "🇺🇿 <b>O'zbek tilida:</b>\n"
-        f"📌 <b>Sarlavha:</b> <code>{seo_data.get('uzum_title_uz', '')}</code>\n\n"
-        f"📋 <b>Afzalliklari:</b>\n{bullets_uz}\n\n"
-        f"🏷 <b>Qidiruv teglari:</b> {tags_uz}\n\n"
-        "━━━━━━━━━━━━━━━━━━━━\n\n"
-        "🇷🇺 <b>На русском языке:</b>\n"
-        f"📌 <b>Название:</b> <code>{seo_data.get('uzum_title_ru', '')}</code>\n\n"
-        f"📋 <b>Преимущества:</b>\n{bullets_ru}\n\n"
-        f"🏷 <b>Поисковые теги:</b> {tags_ru}\n\n"
-        "💡 <i>Nusxalab oling va mahsulot kartochkangizga joylashtiring!</i>"
-    )
+    # Save the generation; the SEO button refers to this record instead of in-memory data
+    generation_id = uuid.uuid4()
+    try:
+        session.add(CardGeneration(
+            id=generation_id,
+            user_id=user_id,
+            original_image_url=file_id,
+            product_metadata=catalog_data or None,
+            generated_image_urls=[m.photo[-1].file_id for m in sent_messages if m.photo],
+            cost_usd=None
+        ))
+        await session.commit()
+    except Exception as e:
+        logger.exception(f"Could not save card generation for user {user_id}: {e}")
+        await session.rollback()
+        catalog_data = {}  # without a saved record the SEO button would not work
 
-    await callback.message.answer(seo_caption, parse_mode="HTML")
-    await callback.answer("SEO matn yuborildi!")
+    ready_text = t(lang, "cards_ready", count=len(cards))
 
+    if not catalog_data.get("title_uz") and not catalog_data.get("title_ru"):
+        await callback.message.answer(f"{ready_text}\n\n{t(lang, 'send_next_photo')}", parse_mode="HTML")
+        return
 
-@router.callback_query(lambda c: c.data == "seo_no")
-async def handle_seo_no(callback: types.CallbackQuery):
-    """Triggered when user clicks 'Yo'q, faqat kartochkalar kifoya'."""
+    # Ask if the user needs the SEO copy (NO marketplace brand names!)
+    builder = InlineKeyboardBuilder()
+    builder.button(text=t(lang, "btn_seo_yes"), callback_data=f"seo_yes:{generation_id}")
+    builder.button(text=t(lang, "btn_seo_no"), callback_data="seo_no")
+    builder.adjust(1)
+
     await callback.message.answer(
-        "👌 <b>Tushunarli!</b> Faqat studiya kartochkalari saqlandi.\n\n"
-        "📸 Keyingi mahsulot rasmini yuborishingiz mumkin!",
+        f"{ready_text}\n\n{t(lang, 'ask_seo')}",
+        reply_markup=builder.as_markup(),
         parse_mode="HTML"
     )
+
+
+def _escape_list(values, separator: str) -> str:
+    if not isinstance(values, list):
+        return ""
+    return separator.join(html.escape(str(v)) for v in values)
+
+
+@router.callback_query(F.data.startswith("seo_yes:"))
+async def handle_seo_yes(callback: types.CallbackQuery, session: AsyncSession, lang: str):
+    """Triggered when user clicks 'SEO matn kerak' (NO marketplace brand names)."""
+    try:
+        generation_id = uuid.UUID(callback.data.split(":", 1)[1])
+    except ValueError:
+        generation_id = None
+
+    seo_data = None
+    if generation_id:
+        stmt = select(CardGeneration).where(
+            CardGeneration.id == generation_id,
+            CardGeneration.user_id == callback.from_user.id
+        )
+        result = await session.execute(stmt)
+        record = result.scalar_one_or_none()
+        seo_data = record.product_metadata if record else None
+
+    if not seo_data:
+        await callback.answer(t(lang, "seo_stale"), show_alert=True)
+        return
+
+    title_uz = html.escape(str(seo_data.get("title_uz") or seo_data.get("uzum_title_uz", "")))
+    title_ru = html.escape(str(seo_data.get("title_ru") or seo_data.get("uzum_title_ru", "")))
+
+    # The SEO copy itself is always uz + ru (marketplace languages); only header/footer follow the UI language
+    part_uz = (
+        f"{t(lang, 'seo_header')}\n\n"
+        "🇺🇿 <b>O'zbek tilida:</b>\n"
+        f"📌 <b>Sarlavha:</b> <code>{title_uz}</code>\n\n"
+        f"📋 <b>Afzalliklari:</b>\n{_escape_list(seo_data.get('bullet_points_uz'), chr(10))}\n\n"
+        f"🏷 <b>Qidiruv teglari:</b> {_escape_list(seo_data.get('seo_tags_uz'), ' ')}"
+    )
+    part_ru = (
+        "🇷🇺 <b>На русском языке:</b>\n"
+        f"📌 <b>Название:</b> <code>{title_ru}</code>\n\n"
+        f"📋 <b>Преимущества:</b>\n{_escape_list(seo_data.get('bullet_points_ru'), chr(10))}\n\n"
+        f"🏷 <b>Поисковые теги:</b> {_escape_list(seo_data.get('seo_tags_ru'), ' ')}\n\n"
+        f"{t(lang, 'seo_footer')}"
+    )
+
+    combined = f"{part_uz}\n\n━━━━━━━━━━━━━━━━━━━━\n\n{part_ru}"
+    if len(combined) <= TELEGRAM_MESSAGE_LIMIT:
+        await callback.message.answer(combined, parse_mode="HTML")
+    else:
+        await callback.message.answer(part_uz[:TELEGRAM_MESSAGE_LIMIT], parse_mode="HTML")
+        await callback.message.answer(part_ru[:TELEGRAM_MESSAGE_LIMIT], parse_mode="HTML")
+
+    await callback.answer(t(lang, "seo_sent"))
+
+
+@router.callback_query(F.data == "seo_no")
+async def handle_seo_no(callback: types.CallbackQuery, lang: str):
+    """Triggered when user clicks 'faqat kartochkalar kifoya'."""
+    await callback.message.answer(t(lang, "seo_declined"), parse_mode="HTML")
     await callback.answer()

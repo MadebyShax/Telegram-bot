@@ -22,7 +22,7 @@ services:
     volumes:
       - postgres_data:/var/lib/postgresql/data
     ports:
-      - "5432:5432"
+      - "127.0.0.1:5432:5432"  # reachable only from this machine, not from the internet
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U postgres -d ecommerce_bot"]
       interval: 5s

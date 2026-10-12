@@ -76,6 +76,13 @@ class Transaction(Base):
         default="PENDING",
         nullable=False
     )  # 'PENDING', 'SUCCESS', 'FAILED'
+    # Telegram's unique charge id: needed for refunds and to never credit the same payment twice
+    telegram_charge_id: Mapped[Optional[str]] = mapped_column(
+        String(255),
+        unique=True,
+        index=True,  # named ix_transactions_telegram_charge_id, same as the migration in init_db
+        nullable=True
+    )
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
         server_default=func.now(),
@@ -92,7 +99,7 @@ class Transaction(Base):
 class CardGeneration(Base):
     """
     Records of zero-prompt product card generations.
-    Contains raw photo link, GPT-4o vision metadata, generated Flux card image links, and SEO copy.
+    Contains Gemini product metadata / SEO copy and Telegram file_ids of the generated cards.
     """
     __tablename__ = "card_generations"
 

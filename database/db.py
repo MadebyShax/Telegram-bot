@@ -1,3 +1,4 @@
+from sqlalchemy import text
 from sqlalchemy.ext.asyncio import create_async_engine, async_sessionmaker, AsyncSession
 from sqlalchemy.orm import DeclarativeBase
 from config import settings
@@ -34,5 +35,16 @@ async def get_session() -> AsyncSession:
 
 async def init_db():
     """Initializes tables in database."""
+    # Import models so they are registered on Base.metadata before create_all
+    import database.models  # noqa: F401
+
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
+        # create_all never alters existing tables: add columns introduced after the first deploy
+        await conn.execute(text(
+            "ALTER TABLE transactions ADD COLUMN IF NOT EXISTS telegram_charge_id VARCHAR(255)"
+        ))
+        await conn.execute(text(
+            "CREATE UNIQUE INDEX IF NOT EXISTS ix_transactions_telegram_charge_id "
+            "ON transactions (telegram_charge_id)"
+        ))
