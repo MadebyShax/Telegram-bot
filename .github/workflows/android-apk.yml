@@ -23,7 +23,11 @@ jobs:
           java-version: "17"
 
       - name: Install Android SDK platform
-        run: yes | sdkmanager --licenses > /dev/null && sdkmanager "platforms;android-34" "build-tools;34.0.0"
+        run: |
+          SDK="${ANDROID_HOME:-/usr/local/lib/android/sdk}"
+          SDKMANAGER="$(ls -d "$SDK"/cmdline-tools/*/bin | head -1)/sdkmanager"
+          yes | "$SDKMANAGER" --licenses > /dev/null || true
+          "$SDKMANAGER" "platforms;android-34" "build-tools;34.0.0"
 
       - name: Unit tests
         run: ./gradlew testDebugUnitTest --no-daemon --stacktrace
