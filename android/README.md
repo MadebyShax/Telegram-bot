@@ -21,7 +21,10 @@ Preferences → OSC:
 - Input port: `7000` (telefon shu portga yuboradi)
 - Output: telefon IP'si, port `7001`
 
-Telefon va kompyuter bir xil Wi-Fi tarmog'ida bo'lishi kerak. Ilovada IP'ni **Sozlamalar** sahifasida kiriting va saqlang.
+Preferences → WebServer (Web API):
+- Yoqing, port `8080` (standart). Klip nomlari, kolonka/qatlam nomlari va miniaturalar shu orqali olinadi.
+
+Telefon va kompyuter bir xil Wi-Fi tarmog'ida bo'lishi kerak. Ilovada **Sozlamalar** sahifasida kompyuter IP'sini, OSC portini (`7000`) va Web API portini (`8080`) kiriting, keyin **Saqlash** ni bosing.
 
 ## APK ni olish
 
@@ -64,9 +67,9 @@ Yangi komanda qo'shish: `ArenaCommands.kt` ga funksiya yozing, so'ng kerakli sah
 
 ## Cheklovlar
 
-- **Teskari aloqa (feedback) yo'q.** Resolume'dan holat kelmaydi: klip nomlari, faol klip va toggle holati telefonda taxmin qilinadi. Toggle tugmalari ilova ochilganidan beri yuborilgan so'nggi holatni eslaydi.
-- **Vaqt asosidagi komandalar** (masalan, "klipni 5 soniya oldinga") klip davomiyligini bilishni talab qiladi, shuning uchun hozircha yo'q. Normallashtirilgan pozitsiya (0..1) bor.
-- **Re-Query** (faol klip ma'lumotini so'rash) ham teskari aloqa talab qiladi, shuning uchun yo'q.
+- Klip nomlari va miniaturalar har 2 soniyada yangilanadi. Miniatura o'zgargan bo'lsa, **⟳ Yangilash** ni bosing.
+- Teskari aloqa faqat REST orqali. Toggle (O'CHIR, SOLO) tugmalarining holati hali ham telefonda taxmin qilinadi.
+- **Vaqt asosidagi komandalar** (masalan, "klipni 5 soniya oldinga") klip davomiyligini talab qiladi, shuning uchun hozircha yo'q. Normallashtirilgan pozitsiya (0..1) bor.
 - **Maxsus OSC** faqat float qiymat yuboradi.
-- Manzillar Companion modulining kodidan olingan. Arena versiyasi boshqacha bo'lsa, ayrim manzillar farq qilishi mumkin.
-- Ilova hali haqiqiy telefonda sinalmagan. Birinchi ishga tushirishda xatolik bo'lsa, xabarni yuboring.
+- Manzillar Companion moduli kodidan olingan. Arena versiyasi boshqacha bo'lsa, ayrim manzillar farq qilishi mumkin.
+- Ilova hali haqiqiy telefonda to'liq sinalmagan. Xatolik bo'lsa, xabarni yuboring.

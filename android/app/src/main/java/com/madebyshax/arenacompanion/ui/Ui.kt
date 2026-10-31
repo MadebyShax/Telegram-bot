@@ -1,6 +1,7 @@
 package com.madebyshax.arenacompanion.ui
 
 import android.content.Context
+import android.graphics.drawable.Drawable
 import android.graphics.Color
 import android.text.InputType
 import android.view.Gravity
@@ -19,6 +20,7 @@ object Palette {
     val STOP: Int = Color.parseColor("#9C3030")
     val TAP: Int = Color.parseColor("#2F6F8F")
     val ON: Int = Color.parseColor("#2F8052")
+    val PREVIEW: Int = Color.parseColor("#B8A02A")
     val MUTED: Int = Color.parseColor("#9A9A9A")
     val LAYER: List<Int> = listOf(
         Color.parseColor("#2F5F9E"),
@@ -38,6 +40,14 @@ object Palette {
 
 fun Context.dp(value: Int): Int = (value * resources.displayMetrics.density).toInt()
 
+/** Bosilganda ko'rinadigan effekt (ripple). Tugma bosilganini ko'rsatadi. */
+fun Context.rippleForeground(): Drawable? {
+    val attrs = obtainStyledAttributes(intArrayOf(android.R.attr.selectableItemBackground))
+    val drawable = attrs.getDrawable(0)
+    attrs.recycle()
+    return drawable
+}
+
 /** Bosiladigan tugma. */
 fun Context.button(label: String, color: Int = Palette.BUTTON, onClick: () -> Unit): Button =
     Button(this).apply {
@@ -47,6 +57,7 @@ fun Context.button(label: String, color: Int = Palette.BUTTON, onClick: () -> Un
         setTextColor(Color.WHITE)
         setBackgroundColor(color)
         stateListAnimator = null
+        foreground = rippleForeground()
         minHeight = dp(48)
         setOnClickListener { onClick() }
     }

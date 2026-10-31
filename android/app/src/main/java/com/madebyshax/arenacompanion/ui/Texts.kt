@@ -65,6 +65,14 @@ object Texts {
         "saved" to "Saqlandi",
         "error" to "Xatolik",
         "sendingTo" to "Manzil",
+        "connected" to "Ulangan",
+        "preview" to "Preview",
+        "empty" to "Bo'sh",
+        "webOk" to "Web API: ulangan",
+        "webFail" to "Web API: javob yo'q (Arena'da WebServer yoqilganmi?)",
+        "refresh" to "⟳ Yangilash",
+        "webPort" to "Web API port",
+        "lastAction" to "So'nggi",
     )
 
     private val ru = mapOf(
@@ -122,6 +130,14 @@ object Texts {
         "saved" to "Сохранено",
         "error" to "Ошибка",
         "sendingTo" to "Адрес",
+        "connected" to "Подключён",
+        "preview" to "Превью",
+        "empty" to "Пусто",
+        "webOk" to "Web API: подключён",
+        "webFail" to "Web API: нет ответа (WebServer в Arena включён?)",
+        "refresh" to "⟳ Обновить",
+        "webPort" to "Порт Web API",
+        "lastAction" to "Последнее",
     )
 
     fun get(key: String): String {

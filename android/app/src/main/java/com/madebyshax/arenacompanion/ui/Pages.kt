@@ -1,13 +1,26 @@
 package com.madebyshax.arenacompanion.ui
 
 import android.content.Context
+import android.content.res.Configuration
+import android.graphics.Bitmap
+import android.graphics.Color
+import android.text.TextUtils
+import android.view.Gravity
 import android.view.View
+import android.widget.FrameLayout
+import android.widget.HorizontalScrollView
+import android.widget.ImageView
 import android.widget.LinearLayout
 import android.widget.ScrollView
+import android.widget.TextView
 import com.madebyshax.arenacompanion.arena.ArenaClient
 import com.madebyshax.arenacompanion.arena.ArenaCommands
+import com.madebyshax.arenacompanion.arena.ArenaSnapshot
+import com.madebyshax.arenacompanion.arena.ClipInfo
+import com.madebyshax.arenacompanion.arena.ClipState
 import com.madebyshax.arenacompanion.arena.Direction
 import com.madebyshax.arenacompanion.osc.OscSender
+import java.util.concurrent.ConcurrentHashMap
 
 /** Arena layoutidagi qatlamlar va kolonkalar soni (TouchOSC layout bilan bir xil). */
 const val LAYERS = 5
@@ -28,7 +41,23 @@ class Screen(
     val sel: Selection,
     val settings: AppSettings,
     val onConnectionChanged: () -> Unit,
-)
+) {
+    /** Resolume'ning oxirgi holati (REST orqali). */
+    var snapshot: ArenaSnapshot = ArenaSnapshot.EMPTY
+        private set
+
+    /** Klip miniatyuralari. Kalit: "qatlam/kolonka". Fon oqimidan to'ldiriladi. */
+    val thumbnails = ConcurrentHashMap<String, Bitmap>()
+
+    /** Ma'lumot yangilanganda sahifa yozuvlarini qayta chizuvchi funksiyalar. Sahifa almashganda tozalanadi. */
+    val listeners = mutableListOf<() -> Unit>()
+
+    /** UI oqimida chaqiriladi. */
+    fun publish(next: ArenaSnapshot) {
+        snapshot = next
+        listeners.forEach { it() }
+    }
+}
 
 /** Sahifa: vertikal, aylantiriladigan. */
 private fun Screen.page(build: LinearLayout.() -> Unit): View {
@@ -52,40 +81,138 @@ private fun LinearLayout.place(view: View) {
     )
 }
 
+/**
+ * Klip qatori. Landshaftda ekranga teng bo'linadi.
+ * Vertikalda katakchalar eni belgilangan, qator gorizontal aylantiriladi.
+ */
+private fun Screen.gridRow(views: List<View>): View {
+    val landscape = ctx.resources.configuration.orientation == Configuration.ORIENTATION_LANDSCAPE
+    if (landscape) return ctx.row(*views.toTypedArray())
+
+    val inner = LinearLayout(ctx).apply { orientation = LinearLayout.HORIZONTAL }
+    views.forEach { view ->
+        inner.addView(
+            view,
+            LinearLayout.LayoutParams(ctx.dp(118), ctx.dp(84)).apply {
+                setMargins(ctx.dp(3), ctx.dp(3), ctx.dp(3), ctx.dp(3))
+            },
+        )
+    }
+    return HorizontalScrollView(ctx).apply { addView(inner) }
+}
+
+private fun Screen.layerLabel(layer: Int): String =
+    snapshot.layerName(layer)?.let { "${t("layer")} $layer\n$it" } ?: "${t("layer")} $layer"
+
+private fun Screen.columnLabel(column: Int): String =
+    snapshot.columnName(column)?.let { "${t("column")} $column\n$it" } ?: "${t("column")} $column"
+
+private fun stateText(state: ClipState?): String = when (state) {
+    ClipState.CONNECTED -> t("connected")
+    ClipState.PREVIEW -> t("preview")
+    else -> t("empty")
+}
+
+private fun Screen.clipTitle(layer: Int, column: Int): String {
+    val info = snapshot.clip(layer, column)
+    val name = info?.name?.takeIf { it.isNotBlank() } ?: "$layer/$column"
+    return "$name · ${stateText(info?.state)}"
+}
+
+/** Klip katakchasi: miniatura, nom va holat rangi. */
+private class ClipCell(ctx: Context, private val baseColor: Int) {
+
+    private val image = ImageView(ctx).apply {
+        scaleType = ImageView.ScaleType.CENTER_CROP
+        alpha = 0.9f
+    }
+
+    private val label = TextView(ctx).apply {
+        setTextColor(Color.WHITE)
+        textSize = 12f
+        gravity = Gravity.CENTER
+        maxLines = 2
+        ellipsize = TextUtils.TruncateAt.END
+        setBackgroundColor(Color.argb(150, 0, 0, 0))
+        setPadding(ctx.dp(4), ctx.dp(2), ctx.dp(4), ctx.dp(2))
+    }
+
+    val view: FrameLayout = FrameLayout(ctx).apply {
+        setBackgroundColor(baseColor)
+        foreground = ctx.rippleForeground()
+        minimumHeight = ctx.dp(84)
+        addView(
+            image,
+            FrameLayout.LayoutParams(FrameLayout.LayoutParams.MATCH_PARENT, FrameLayout.LayoutParams.MATCH_PARENT),
+        )
+        addView(
+            label,
+            FrameLayout.LayoutParams(FrameLayout.LayoutParams.MATCH_PARENT, FrameLayout.LayoutParams.WRAP_CONTENT, Gravity.BOTTOM),
+        )
+    }
+
+    fun update(info: ClipInfo?, thumbnail: Bitmap?, column: Int) {
+        label.text = info?.name?.takeIf { it.isNotBlank() } ?: "$column"
+        image.setImageBitmap(thumbnail)
+        view.setBackgroundColor(
+            when (info?.state) {
+                ClipState.CONNECTED -> Palette.ON
+                ClipState.PREVIEW -> Palette.PREVIEW
+                else -> baseColor
+            },
+        )
+    }
+}
+
 // ─── Klipler: qatlamlar × kolonkalar to'ri ─────────────────────────
 
 fun Screen.clipsPage(): View = page {
     place(ctx.button(t("stopAll"), Palette.STOP) { client.run(ArenaCommands.stopAll()) })
 
     val columnButtons = (1..COLUMNS).map { column ->
-        ctx.button("${t("column")} $column") { client.run(ArenaCommands.triggerColumn(column)) }
+        ctx.button(columnLabel(column)) { client.run(ArenaCommands.triggerColumn(column)) }
+            .also { button -> listeners += { button.text = columnLabel(column) } }
     }
-    place(ctx.row(*columnButtons.toTypedArray()))
+    place(gridRow(columnButtons))
 
     for (layer in 1..LAYERS) {
         val color = Palette.LAYER[(layer - 1) % Palette.LAYER.size]
-        val cells = mutableListOf<View>(
-            ctx.button("${t("layer")} $layer", color) {
-                sel.layer = layer
-                client.run(ArenaCommands.layerSelect(layer))
-            },
-        )
+        val layerButton = ctx.button(layerLabel(layer), color) {
+            sel.layer = layer
+            client.run(ArenaCommands.layerSelect(layer))
+        }
+        listeners += { layerButton.text = layerLabel(layer) }
+
+        val cells = mutableListOf<View>(layerButton)
         for (column in 1..COLUMNS) {
-            cells += ctx.button("$column", Palette.dim(color)) {
+            val cell = ClipCell(ctx, Palette.dim(color))
+            cell.view.setOnClickListener {
                 sel.layer = layer
                 sel.column = column
                 client.run(ArenaCommands.connectClip(layer, column))
             }
+            listeners += { cell.update(snapshot.clip(layer, column), thumbnails["$layer/$column"], column) }
+            cells += cell.view
         }
-        place(ctx.row(*cells.toTypedArray()))
+        place(gridRow(cells))
     }
 }
 
 // ─── Qatlam ────────────────────────────────────────────────────────
 
 fun Screen.layerPage(): View = page {
-    place(ctx.stepper(t("layer"), sel.layer, 1, LAYERS) { sel.layer = it })
+    val caption = ctx.text("")
+    place(caption)
+    fun refreshCaption() {
+        caption.text = snapshot.layerName(sel.layer)?.let { "${t("layer")} ${sel.layer}: $it" } ?: "${t("layer")} ${sel.layer}"
+    }
+    refreshCaption()
+    listeners += { refreshCaption() }
 
+    place(ctx.stepper(t("layer"), sel.layer, 1, LAYERS) {
+        sel.layer = it
+        refreshCaption()
+    })
     place(
         ctx.row(
             ctx.button(t("select")) { client.run(ArenaCommands.layerSelect(sel.layer)) },
@@ -126,8 +253,22 @@ fun Screen.layerPage(): View = page {
 // ─── Klip sozlamalari ──────────────────────────────────────────────
 
 fun Screen.clipPage(): View = page {
-    place(ctx.stepper(t("layer"), sel.layer, 1, LAYERS) { sel.layer = it })
-    place(ctx.stepper(t("column"), sel.column, 1, COLUMNS) { sel.column = it })
+    val caption = ctx.text("")
+    place(caption)
+    fun refreshCaption() {
+        caption.text = clipTitle(sel.layer, sel.column)
+    }
+    refreshCaption()
+    listeners += { refreshCaption() }
+
+    place(ctx.stepper(t("layer"), sel.layer, 1, LAYERS) {
+        sel.layer = it
+        refreshCaption()
+    })
+    place(ctx.stepper(t("column"), sel.column, 1, COLUMNS) {
+        sel.column = it
+        refreshCaption()
+    })
 
     place(
         ctx.row(
@@ -167,8 +308,20 @@ fun Screen.clipPage(): View = page {
 // ─── Guruhlar ──────────────────────────────────────────────────────
 
 fun Screen.groupsPage(): View = page {
+    val caption = ctx.text("")
+    place(caption)
+    fun refreshCaption() {
+        caption.text = snapshot.columnName(sel.column)?.let { "${t("column")} ${sel.column}: $it" }
+            ?: "${t("column")} ${sel.column}"
+    }
+    refreshCaption()
+    listeners += { refreshCaption() }
+
     place(ctx.stepper(t("group"), sel.group, 1, 99) { sel.group = it })
-    place(ctx.stepper(t("column"), sel.column, 1, 99) { sel.column = it })
+    place(ctx.stepper(t("column"), sel.column, 1, 99) {
+        sel.column = it
+        refreshCaption()
+    })
 
     place(
         ctx.row(
@@ -281,16 +434,19 @@ fun Screen.compositionPage(): View = page {
 fun Screen.settingsPage(): View = page {
     val hostField = ctx.field(t("host"), settings.host)
     val portField = ctx.field(t("port"), settings.port.toString(), numeric = true)
+    val webPortField = ctx.field(t("webPort"), settings.webPort.toString(), numeric = true)
     val lastField = ctx.field(t("lastColumn"), settings.lastColumn.toString(), numeric = true)
     val saved = ctx.text("")
 
     place(hostField)
     place(portField)
+    place(webPortField)
     place(lastField)
     place(
         ctx.button(t("save"), Palette.TAP) {
             settings.host = hostField.text.toString().trim()
             settings.port = portField.text.toString().toIntOrNull() ?: 7000
+            settings.webPort = webPortField.text.toString().toIntOrNull() ?: 8080
             settings.lastColumn = lastField.text.toString().toIntOrNull() ?: 10
             sender.host = settings.host
             sender.port = settings.port

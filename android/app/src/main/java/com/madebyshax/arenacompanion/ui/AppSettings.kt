@@ -15,6 +15,11 @@ class AppSettings(context: Context) {
         get() = prefs.getInt("port", 7000)
         set(value) = prefs.edit().putInt("port", value).apply()
 
+    /** Resolume WebAPI porti (WebServer). Klip nomlari va miniatyuralar shu portidan olinadi. */
+    var webPort: Int
+        get() = prefs.getInt("webPort", 8080)
+        set(value) = prefs.edit().putInt("webPort", value).apply()
+
     /** Guruh kolonkalari next/prev uchun oxirgi kolonka raqami. */
     var lastColumn: Int
         get() = prefs.getInt("lastColumn", 10)

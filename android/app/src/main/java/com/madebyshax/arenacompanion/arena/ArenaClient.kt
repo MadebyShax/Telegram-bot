@@ -17,8 +17,12 @@ class ArenaClient(private val sender: OscSender) {
     private val flags = mutableMapOf<String, Boolean>()
     private val groupColumns = mutableMapOf<Int, Int>()
 
+    /** Har bir yuborilgan komandadan keyin chaqiriladi (UI oqimida). Oxirgi amalni ko'rsatish uchun. */
+    var onSent: ((ArenaCmd) -> Unit)? = null
+
     fun run(cmd: ArenaCmd) {
         sender.send(cmd.message)
+        onSent?.invoke(cmd)
         if (cmd.pulse) {
             val release = OscMessage(cmd.message.address, listOf(OscArg.I(0)))
             sender.sendAfter(release, PULSE_RELEASE_MS)
