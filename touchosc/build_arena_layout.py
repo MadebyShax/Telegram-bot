@@ -61,7 +61,7 @@ OSC = {
     "bypass": "/composition/layers/{layer}/bypassed",
     "clear": "/composition/layers/{layer}/clear",
     "master": "/composition/master",
-    "stop_all": "/composition/disconnect-all",
+    "stop_all": "/composition/disconnectall",
 }
 
 # Barcha matnlar shu yerda. Yangi til qo'shish uchun yangi lug'at kifoya.
