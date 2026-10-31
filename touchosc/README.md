@@ -32,23 +32,23 @@ Telefondan Resolume Arena'ni boshqarish uchun TouchOSC layout. Tuzilishi Arena'n
 **TouchOSC'da:** Settings → Connections → OSC bo'limida:
 - Connection 1: yoqing
 - Host: Arena ishlayotgan kompyuterning IP manzili (masalan `192.168.1.10`)
-- Port: `7000` (Arena'ning standart OSC kirish porti; sozlamalarda tekshiring)
+- Port: `7000` (Resolume'ning OSC kirish porti)
 
-**Arena'da:** Preferences → OSC bo'limida OSC yoqilganini va portlar mosligini tekshiring. Arena'dan teskari aloqa (holat yangilanishi) kerak bo'lsa, telefon IP'si va TouchOSC'ning kirish porti (odatda `9000`) yoziladi.
+**TouchOSC'da:** Incoming port: `7001` (Resolume'ning OSC chiqish porti). Standart TouchOSC porti `9000`, lekin Companion moduli bilan bir xil bo'lishi uchun `7001` qilish qulay.
+
+**Arena'da:** Preferences → OSC bo'limida:
+- Input port: `7000`
+- Output: telefon IP'si, port `7001`
 
 Bir xil Wi-Fi tarmog'ida bo'lishi shart. Kompyuter firewall'i UDP portlarni bloklamasligi kerak.
 
 ## 3-qadam: Tekshirish
 
-Arena'da OSC monitorni oching va har bir tugmani bosib ko'ring. To'g'ri kelgan xabar monitorda ko'rinadi.
+Manzillar [bitfocus/companion-module-resolume-arena](https://github.com/bitfocus/companion-module-resolume-arena) moduli kodidan olingan (Resolume saytiga kirish bloklangan edi). Ular Companion moduli ishlatadigan manzillar bilan bir xil.
 
-Quyidagi manzillar **Resolume'ning rasmiy ro'yxatidan tasdiqlanmagan** (men bu sinovni sayt bloklangani uchun bajara olmadim). Ular ehtimol noto'g'ri:
+Tekshirish uchun Arena'da OSC monitorni oching va tugmalarni bosing. Ishlamaydigan funksiya bo'lsa, `build_arena_layout.py` ichidagi `OSC` lug'atini tuzating va skriptni qayta ishga tushiring.
 
-- `/composition/tempo/tap`
-- `/composition/video/blackout`
-- `/composition/disconnectall`
-
-Agar biror tugma ishlamasa, Arena'da shu funksiyaning haqiqiy manzilini toping va `build_arena_layout.py` ichidagi `OSC` lug'atida tuzating.
+Qora ekran: `QORA` tugmasi `/composition/video/opacity` ni 0 ga, `TIKLASH` tugmasi 1 ga qo'yadi. Arena versiyasiga qarab, bu boshqacha ishlashi mumkin, shuning uchun birinchi navbatda tekshiring.
 
 ## Qayta yaratish (ixtiyoriy)
 
@@ -69,4 +69,5 @@ Sozlamalar skriptning boshida:
 
 - Klip va qatlam **nomlari** statik yozilgan (`Klip 1`, `Qatlam 1`). Arena'dagi haqiqiy nomlar va rasmlar (thumbnail) ko'rinmaydi, chunki bu teskari aloqa talab qiladi.
 - Tugmalar holati (qaysi klip yoqilgan) telefonda aks etmaydi. Buni keyingi bosqichda qo'shish mumkin.
+- Manzillar Companion moduli kodidan olingan. Arena'ning boshqa versiyasida ular farq qilishi mumkin.
 - Layout TouchOSC 1.9.12 Editor'da sinab ko'rilmagan. Fayl formati TouchOSC 1.x bilan mos bo'lishi kerak, lekin ochilganda biror xatolik chiqsa, xabarni yuboring.

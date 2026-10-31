@@ -48,12 +48,11 @@ TAP = "#2f6f8f"
 BUTTON = "#3a3a3a"
 LAYER_COLORS = ["#2f5f9e", "#2f8052", "#a8782a", "#7d4696", "#a84545"]
 
-# Resolume Arena OSC manzillari. Hammasi shu yerda, shuning uchun Arena
-# versiyasi boshqacha bo'lsa faqat shu lug'atni tuzatish kifoya.
-# Haqiqiy manzilni Arena'da tekshiring (OSC monitor yoki Shortcuts oynasi).
+# Resolume Arena OSC manzillari. Manba: bitfocus/companion-module-resolume-arena
+# (src/ papkasidagi buyruqlar). Arena versiyasi boshqacha bo'lsa, shu lug'atni tuzating.
 OSC = {
-    "tap": "/composition/tempo/tap",
-    "blackout": "/composition/video/blackout",
+    "tap": "/composition/tempocontroller/tempotap",
+    "video_opacity": "/composition/video/opacity",
     "column": "/composition/columns/{col}/connect",
     "layer_select": "/composition/layers/{layer}/select",
     "clip": "/composition/layers/{layer}/clips/{col}/connect",
@@ -62,7 +61,7 @@ OSC = {
     "bypass": "/composition/layers/{layer}/bypassed",
     "clear": "/composition/layers/{layer}/clear",
     "master": "/composition/master",
-    "stop_all": "/composition/disconnectall",
+    "stop_all": "/composition/disconnect-all",
 }
 
 # Barcha matnlar shu yerda. Yangi til qo'shish uchun yangi lug'at kifoya.
@@ -71,7 +70,8 @@ TEXTS = {
         "file": "arena_uz.tosc",
         "title": "ARENA  |  BOSHQARUV",
         "tap": "TAP",
-        "blackout": "QORA EKRAN",
+        "blackout": "QORA",
+        "restore": "TIKLASH",
         "columns": "KOLONKALAR",
         "control": "BOSHQARUV",
         "master": "ASOSIY",
@@ -88,7 +88,8 @@ TEXTS = {
         "file": "arena_ru.tosc",
         "title": "ARENA  |  УПРАВЛЕНИЕ",
         "tap": "TAP",
-        "blackout": "БЛЭКАУТ",
+        "blackout": "БЛЭК",
+        "restore": "ВКЛ",
         "columns": "КОЛОНКИ",
         "control": "УПРАВЛЕНИЕ",
         "master": "МАСТЕР",
@@ -144,12 +145,15 @@ def add_button(
     address: str,
     *,
     toggle: bool = False,
+    value: str = "1",
+    conversion: str = "INTEGER",
     size: int = 12,
 ) -> None:
     """Tugma qo'shadi.
 
-    toggle=False: bosilganda 1 yuboradi (klip, kolonka, tozalash).
-    toggle=True:  holat o'zgarganda x qiymatini yuboradi (SOLO, O'CHIR).
+    toggle=False: bosilganda `value` yuboradi (klip, kolonka, tozalash, qora ekran).
+    toggle=True:  holat o'zgarganda x qiymatini butun son sifatida yuboradi (SOLO, O'CHIR).
+    Companion moduli ham triggerlarni butun son (i) sifatida yuboradi.
     """
     if toggle:
         btn = button(
@@ -157,14 +161,16 @@ def add_button(
             frame=frame,
             color=color,
             button_type=ButtonType.TOGGLE_PRESS,
-            messages=[ui.osc(address, on="ANY")],
+            messages=[ui.osc(address, args=[ui.value("x", conversion="INTEGER")], on="ANY")],
         )
     else:
         btn = button(
             name=name,
             frame=frame,
             color=color,
-            messages=[ui.osc(address, args=[ui.const("1")], on="RISE")],
+            messages=[
+                ui.osc(address, args=[ui.const(value, conversion=conversion)], on="RISE")
+            ],
         )
     root.children.append(btn)
     if text:
@@ -197,9 +203,14 @@ def build(lang: str) -> Document:
         root, "tap", (400, 8, 90, TOP_H - 16), TAP, t["tap"],
         OSC["tap"],
     )
+    # Qora ekran: video opacity 0 (qora), TIKLASH: qaytaradi (1)
     add_button(
-        root, "blackout", (RIGHT_X, 8, RIGHT_W, TOP_H - 16), STOP, t["blackout"],
-        OSC["blackout"], toggle=True,
+        root, "blackout", (RIGHT_X, 8, 72, TOP_H - 16), STOP, t["blackout"],
+        OSC["video_opacity"], value="0", conversion="FLOAT", size=11,
+    )
+    add_button(
+        root, "restore", (RIGHT_X + 76, 8, 72, TOP_H - 16), BUTTON, t["restore"],
+        OSC["video_opacity"], value="1", conversion="FLOAT", size=11,
     )
 
     # 2. Kolonkalar qatori
