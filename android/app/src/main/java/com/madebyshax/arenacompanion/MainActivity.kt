@@ -2,7 +2,9 @@ package com.madebyshax.arenacompanion
 
 import android.app.Activity
 import android.content.res.Configuration
+import android.graphics.Bitmap
 import android.graphics.BitmapFactory
+import android.util.Base64
 import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
@@ -14,8 +16,13 @@ import android.widget.TextView
 import com.madebyshax.arenacompanion.arena.ArenaClient
 import com.madebyshax.arenacompanion.arena.ArenaRest
 import com.madebyshax.arenacompanion.arena.ArenaSnapshot
+import com.madebyshax.arenacompanion.arena.ClipInfo
+import com.madebyshax.arenacompanion.arena.ClipState
+import com.madebyshax.arenacompanion.arena.ColumnInfo
+import com.madebyshax.arenacompanion.arena.layerNameFromJson
 import com.madebyshax.arenacompanion.osc.OscSender
 import com.madebyshax.arenacompanion.ui.*
+import java.io.IOException
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.Executors
 
@@ -38,8 +45,8 @@ class MainActivity : Activity() {
     private var lastAction = ""
     private var refreshing = false
 
-    /** Miniatura so'ralgan kalitlar. Muvaffaqiyatsiz bo'lsa qayta so'ralmaydi (yangilash bosilmaguncha). */
-    private val thumbnailsRequested = ConcurrentHashMap.newKeySet<String>()
+    /** Miniatura xatosi bo'lgan kliplar: qayta urinish vaqti (ms). */
+    private val thumbRetryAt = ConcurrentHashMap<String, Long>()
 
     private val io = Executors.newSingleThreadExecutor()
     private val handler = Handler(Looper.getMainLooper())
@@ -140,41 +147,29 @@ class MainActivity : Activity() {
     }
 
     /**
-     * Resolume holatini REST orqali yangilaydi. force = true bo'lsa miniaturalar ham qayta yuklanadi.
-     * Bir vaqtning o'zida bitta so'rov ketadi.
+     * Resolume holatini REST orqali yangilaydi: qatlam/kolonka nomlari, klip holatlari va miniaturalar.
+     * force = true bo'lsa miniaturalar ham qayta yuklanadi. Bir vaqtda bitta sweep ketadi.
      */
     private fun refresh(force: Boolean) {
         if (refreshing) return
         refreshing = true
 
-        val host = settings.host
-        val webPort = settings.webPort
-        val rest = ArenaRest(host, webPort)
-
+        val rest = ArenaRest(settings.host, settings.webPort)
         io.execute {
             try {
-                val snapshot = ArenaSnapshot.parse(rest.fetchComposition())
+                if (force) {
+                    screen.thumbnails.clear()
+                    thumbRetryAt.clear()
+                }
+                val snapshot = fetchSnapshot(rest)
                 runOnUiThread {
                     webState = t("webOk")
                     screen.publish(snapshot)
                     renderStatus()
                 }
-
-                if (force) {
-                    screen.thumbnails.clear()
-                    thumbnailsRequested.clear()
+                if (loadThumbnails(rest)) {
+                    runOnUiThread { screen.publish(snapshot) }
                 }
-                var loaded = false
-                for ((layer, column) in snapshot.clipKeys()) {
-                    val key = "$layer/$column"
-                    if (screen.thumbnails.containsKey(key) || !thumbnailsRequested.add(key)) continue
-                    val bytes = runCatching { rest.fetchThumbnail(layer, column) }.getOrNull() ?: continue
-                    BitmapFactory.decodeByteArray(bytes, 0, bytes.size)?.let {
-                        screen.thumbnails[key] = it
-                        loaded = true
-                    }
-                }
-                if (loaded) runOnUiThread { screen.publish(snapshot) }
             } catch (e: Exception) {
                 runOnUiThread {
                     webState = t("webFail")
@@ -186,6 +181,73 @@ class MainActivity : Activity() {
         }
     }
 
+    /** Ko'rsatiladigan to'rning (LAYERS x COLUMNS) holatini o'qiydi. Bitta ham javob bo'lmasa xato chiqaradi. */
+    private fun fetchSnapshot(rest: ArenaRest): ArenaSnapshot {
+        var answered = 0
+        val layerNames = mutableMapOf<Int, String>()
+        val columns = mutableMapOf<Int, ColumnInfo>()
+        val clips = mutableMapOf<Pair<Int, Int>, ClipInfo>()
+
+        for (layer in 1..LAYERS) {
+            runCatching { layerNameFromJson(rest.fetchLayer(layer)) }.onSuccess {
+                layerNames[layer] = it
+                answered++
+            }
+        }
+        for (column in 1..COLUMNS) {
+            runCatching { ColumnInfo.fromJson(rest.fetchColumn(column)) }.onSuccess {
+                columns[column] = it
+                answered++
+            }
+        }
+        for (layer in 1..LAYERS) {
+            for (column in 1..COLUMNS) {
+                val info = runCatching { ClipInfo.fromJson(rest.fetchClip(layer, column)) }
+                    .onSuccess { answered++ }
+                    .getOrDefault(ClipInfo("", ClipState.EMPTY))
+                clips[layer to column] = info
+            }
+        }
+
+        if (answered == 0) throw IOException("Web API javob bermadi")
+        return ArenaSnapshot(layerNames, clips, columns)
+    }
+
+    /**
+     * Yo'q miniaturalarni yuklaydi. Xato bo'lsa THUMB_RETRY_MS dan keyin qayta urinadi.
+     * Yangi miniatura yuklangan bo'lsa true qaytaradi.
+     */
+    private fun loadThumbnails(rest: ArenaRest): Boolean {
+        var loaded = false
+        val now = System.currentTimeMillis()
+        for (layer in 1..LAYERS) {
+            for (column in 1..COLUMNS) {
+                val key = "$layer/$column"
+                if (screen.thumbnails.containsKey(key)) continue
+                if ((thumbRetryAt[key] ?: 0L) > now) continue
+
+                val bitmap = runCatching { rest.fetchThumbnail(layer, column) }.getOrNull()
+                    ?.let { decodeThumbnail(it) }
+                if (bitmap != null) {
+                    screen.thumbnails[key] = bitmap
+                    loaded = true
+                } else {
+                    thumbRetryAt[key] = now + THUMB_RETRY_MS
+                }
+            }
+        }
+        return loaded
+    }
+
+    /** Miniatura baytlarini rasmga aylantiradi. Javob base64 matn bo'lsa ham ishlaydi. */
+    private fun decodeThumbnail(bytes: ByteArray): Bitmap? {
+        BitmapFactory.decodeByteArray(bytes, 0, bytes.size)?.let { return it }
+        return runCatching {
+            val raw = Base64.decode(String(bytes, Charsets.US_ASCII).trim(), Base64.DEFAULT)
+            BitmapFactory.decodeByteArray(raw, 0, raw.size)
+        }.getOrNull()
+    }
+
     override fun onDestroy() {
         handler.removeCallbacks(poll)
         io.shutdownNow()
@@ -195,5 +257,6 @@ class MainActivity : Activity() {
 
     companion object {
         private const val POLL_MS = 2000L
+        private const val THUMB_RETRY_MS = 15_000L
     }
 }

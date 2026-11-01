@@ -52,9 +52,19 @@ class Screen(
     /** Ma'lumot yangilanganda sahifa yozuvlarini qayta chizuvchi funksiyalar. Sahifa almashganda tozalanadi. */
     val listeners = mutableListOf<() -> Unit>()
 
-    /** UI oqimida chaqiriladi. */
+    /** Bosilgan, lekin hali Resolume tasdiqlamagan kliplar. Kalit: "qatlam/kolonka". */
+    val pressed: MutableSet<String> = ConcurrentHashMap.newKeySet()
+
+    /** UI oqimida chaqiriladi. Yangi holat kelganda "bosilgan" belgisi tasdiqlangan hisoblanadi. */
     fun publish(next: ArenaSnapshot) {
         snapshot = next
+        pressed.clear()
+        listeners.forEach { it() }
+    }
+
+    /** Klip bosilganda darhol belgilaydi (UI oqimida chaqiriladi). */
+    fun markPressed(layer: Int, column: Int) {
+        pressed.add("$layer/$column")
         listeners.forEach { it() }
     }
 }
@@ -151,11 +161,12 @@ private class ClipCell(ctx: Context, private val baseColor: Int) {
         )
     }
 
-    fun update(info: ClipInfo?, thumbnail: Bitmap?, column: Int) {
+    fun update(info: ClipInfo?, thumbnail: Bitmap?, column: Int, pressedNow: Boolean) {
         label.text = info?.name?.takeIf { it.isNotBlank() } ?: "$column"
         image.setImageBitmap(thumbnail)
+        val state = if (pressedNow) ClipState.CONNECTED else info?.state
         view.setBackgroundColor(
-            when (info?.state) {
+            when (state) {
                 ClipState.CONNECTED -> Palette.ON
                 ClipState.PREVIEW -> Palette.PREVIEW
                 else -> baseColor
@@ -170,8 +181,16 @@ fun Screen.clipsPage(): View = page {
     place(ctx.button(t("stopAll"), Palette.STOP) { client.run(ArenaCommands.stopAll()) })
 
     val columnButtons = (1..COLUMNS).map { column ->
-        ctx.button(columnLabel(column)) { client.run(ArenaCommands.triggerColumn(column)) }
-            .also { button -> listeners += { button.text = columnLabel(column) } }
+        ctx.button(columnLabel(column)) {
+            client.run(ArenaCommands.triggerColumn(column))
+        }.also { button ->
+            listeners += {
+                button.text = columnLabel(column)
+                button.setBackgroundColor(
+                    if (snapshot.columnState(column) == ClipState.CONNECTED) Palette.ON else Palette.BUTTON,
+                )
+            }
+        }
     }
     place(gridRow(columnButtons))
 
@@ -190,8 +209,16 @@ fun Screen.clipsPage(): View = page {
                 sel.layer = layer
                 sel.column = column
                 client.run(ArenaCommands.connectClip(layer, column))
+                markPressed(layer, column)
             }
-            listeners += { cell.update(snapshot.clip(layer, column), thumbnails["$layer/$column"], column) }
+            listeners += {
+                cell.update(
+                    snapshot.clip(layer, column),
+                    thumbnails["$layer/$column"],
+                    column,
+                    pressed.contains("$layer/$column"),
+                )
+            }
             cells += cell.view
         }
         place(gridRow(cells))
