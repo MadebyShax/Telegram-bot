@@ -20,6 +20,11 @@ class AppSettings(context: Context) {
         get() = prefs.getInt("webPort", 8080)
         set(value) = prefs.edit().putInt("webPort", value).apply()
 
+    /** Klip miniaturalarini yuklash. Kompyuter sekin bo'lsa o'chirib qo'yish mumkin. */
+    var thumbnails: Boolean
+        get() = prefs.getBoolean("thumbnails", true)
+        set(value) = prefs.edit().putBoolean("thumbnails", value).apply()
+
     /** Guruh kolonkalari next/prev uchun oxirgi kolonka raqami. */
     var lastColumn: Int
         get() = prefs.getInt("lastColumn", 10)

@@ -4,10 +4,10 @@ import android.app.Activity
 import android.content.res.Configuration
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
-import android.util.Base64
 import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
+import android.util.Base64
 import android.view.View
 import android.widget.FrameLayout
 import android.widget.HorizontalScrollView
@@ -29,7 +29,7 @@ import java.util.concurrent.Executors
 /**
  * Asosiy ekran.
  * - OSC komandalari UDP orqali yuboriladi (ArenaClient).
- * - Klip nomlari, holatlar va miniaturalar REST (WebAPI) orqali har POLL_MS da yangilanadi.
+ * - Qatlam/kolonka soni, nomlar, klip holatlari va miniaturalar REST (WebAPI) orqali yangilanadi.
  * - Yuqorida sahifa tugmalari, pastda ulanish holati va oxirgi amal.
  */
 class MainActivity : Activity() {
@@ -44,6 +44,15 @@ class MainActivity : Activity() {
     private var webState = ""
     private var lastAction = ""
     private var refreshing = false
+    private var pollCount = 0
+
+    /** Resolume'dagi haqiqiy o'lchamlar (aniqlangan). 0 = hali aniqlanmagan. */
+    private var layerTotal = 0
+    private var columnTotal = 0
+
+    /** Oxirgi o'qilgan nomlar. Ular kamroq tez-tez yangilanadi. */
+    private var layerNames: Map<Int, String> = emptyMap()
+    private var columnInfos: Map<Int, ColumnInfo> = emptyMap()
 
     /** Miniatura xatosi bo'lgan kliplar: qayta urinish vaqti (ms). */
     private val thumbRetryAt = ConcurrentHashMap<String, Long>()
@@ -142,37 +151,50 @@ class MainActivity : Activity() {
 
     private fun renderStatus() {
         val web = webState.ifEmpty { "…" }
+        val size = if (layerTotal > 0) " · ${layerTotal}×${columnTotal}" else ""
         val last = if (lastAction.isEmpty()) "" else " · ${t("lastAction")}: $lastAction"
-        status.text = "→ ${settings.host}:${settings.port} · $web$last"
+        status.text = "→ ${settings.host}:${settings.port} · $web$size$last"
     }
 
     /**
-     * Resolume holatini REST orqali yangilaydi: qatlam/kolonka nomlari, klip holatlari va miniaturalar.
-     * force = true bo'lsa miniaturalar ham qayta yuklanadi. Bir vaqtda bitta sweep ketadi.
+     * Resolume holatini REST orqali yangilaydi.
+     * force = true bo'lsa: o'lcham qayta aniqlanadi, nomlar va miniaturalar qayta o'qiladi.
+     * Bir vaqtda bitta sweep ketadi.
      */
     private fun refresh(force: Boolean) {
         if (refreshing) return
         refreshing = true
 
         val rest = ArenaRest(settings.host, settings.webPort)
+        val withNames = force || layerTotal == 0 || pollCount % NAME_EVERY == 0
+        pollCount++
+
         io.execute {
             try {
                 if (force) {
                     screen.thumbnails.clear()
                     thumbRetryAt.clear()
                 }
-                val snapshot = fetchSnapshot(rest)
+                if (force || layerTotal == 0 || columnTotal == 0) discover(rest)
+                if (withNames) readNames(rest)
+
+                val snapshot = readClips(rest)
                 runOnUiThread {
                     webState = t("webOk")
+                    val resized = snapshot.layerCount != screen.snapshot.layerCount ||
+                        snapshot.columnCount != screen.snapshot.columnCount
                     screen.publish(snapshot)
+                    if (resized) showPage(currentPage)
                     renderStatus()
                 }
-                if (loadThumbnails(rest)) {
+
+                if (settings.thumbnails && loadThumbnails(rest)) {
                     runOnUiThread { screen.publish(snapshot) }
                 }
             } catch (e: Exception) {
+                val reason = e.message ?: e.javaClass.simpleName
                 runOnUiThread {
-                    webState = t("webFail")
+                    webState = "${t("webFail")} ($reason)"
                     renderStatus()
                 }
             } finally {
@@ -181,51 +203,63 @@ class MainActivity : Activity() {
         }
     }
 
-    /** Ko'rsatiladigan to'rning (LAYERS x COLUMNS) holatini o'qiydi. Bitta ham javob bo'lmasa xato chiqaradi. */
-    private fun fetchSnapshot(rest: ArenaRest): ArenaSnapshot {
-        var answered = 0
-        val layerNames = mutableMapOf<Int, String>()
-        val columns = mutableMapOf<Int, ColumnInfo>()
-        val clips = mutableMapOf<Pair<Int, Int>, ClipInfo>()
+    /** Qatlamlar va kolonkalar sonini aniqlaydi: javob berguncha yoki 404 chiqguncha. */
+    private fun discover(rest: ArenaRest) {
+        layerTotal = countUntilMissing(MAX_LAYERS) { rest.fetchLayer(it) }
+        columnTotal = countUntilMissing(MAX_COLUMNS) { rest.fetchColumn(it) }
+        if (layerTotal == 0 || columnTotal == 0) {
+            throw IOException("Web API javob bermadi")
+        }
+    }
 
-        for (layer in 1..LAYERS) {
-            runCatching { layerNameFromJson(rest.fetchLayer(layer)) }.onSuccess {
-                layerNames[layer] = it
-                answered++
-            }
+    private fun countUntilMissing(max: Int, fetch: (Int) -> String): Int {
+        var count = 0
+        for (index in 1..max) {
+            if (runCatching { fetch(index) }.isFailure) break
+            count = index
         }
-        for (column in 1..COLUMNS) {
-            runCatching { ColumnInfo.fromJson(rest.fetchColumn(column)) }.onSuccess {
-                columns[column] = it
-                answered++
-            }
-        }
-        for (layer in 1..LAYERS) {
-            for (column in 1..COLUMNS) {
+        return count
+    }
+
+    private fun readNames(rest: ArenaRest) {
+        layerNames = (1..layerTotal).mapNotNull { layer ->
+            runCatching { layer to layerNameFromJson(rest.fetchLayer(layer)) }.getOrNull()
+        }.toMap()
+        columnInfos = (1..columnTotal).mapNotNull { column ->
+            runCatching { column to ColumnInfo.fromJson(rest.fetchColumn(column)) }.getOrNull()
+        }.toMap()
+    }
+
+    /** Har bir klipning holatini o'qiydi. Javob bermagan klip bo'sh hisoblanadi. */
+    private fun readClips(rest: ArenaRest): ArenaSnapshot {
+        var answered = 0
+        val clips = mutableMapOf<Pair<Int, Int>, ClipInfo>()
+        for (layer in 1..layerTotal) {
+            for (column in 1..columnTotal) {
                 val info = runCatching { ClipInfo.fromJson(rest.fetchClip(layer, column)) }
                     .onSuccess { answered++ }
                     .getOrDefault(ClipInfo("", ClipState.EMPTY))
                 clips[layer to column] = info
             }
         }
-
-        if (answered == 0) throw IOException("Web API javob bermadi")
-        return ArenaSnapshot(layerNames, clips, columns)
+        if (answered == 0) throw IOException("Klip javoblari yo'q")
+        return ArenaSnapshot(layerNames, clips, columnInfos, layerTotal, columnTotal)
     }
 
     /**
-     * Yo'q miniaturalarni yuklaydi. Xato bo'lsa THUMB_RETRY_MS dan keyin qayta urinadi.
-     * Yangi miniatura yuklangan bo'lsa true qaytaradi.
+     * Yo'q miniaturalarni yuklaydi. Har so'rov orasida pauza bor, shuning uchun Resolume qotib qolmaydi.
+     * Xato bo'lsa THUMB_RETRY_MS dan keyin qayta urinadi. Yangi miniatura yuklangan bo'lsa true.
      */
     private fun loadThumbnails(rest: ArenaRest): Boolean {
         var loaded = false
         val now = System.currentTimeMillis()
-        for (layer in 1..LAYERS) {
-            for (column in 1..COLUMNS) {
+        for (layer in 1..layerTotal) {
+            for (column in 1..columnTotal) {
                 val key = "$layer/$column"
                 if (screen.thumbnails.containsKey(key)) continue
                 if ((thumbRetryAt[key] ?: 0L) > now) continue
 
+                Thread.sleep(THUMB_GAP_MS)
                 val bitmap = runCatching { rest.fetchThumbnail(layer, column) }.getOrNull()
                     ?.let { decodeThumbnail(it) }
                 if (bitmap != null) {
@@ -256,7 +290,20 @@ class MainActivity : Activity() {
     }
 
     companion object {
-        private const val POLL_MS = 2000L
+        /** Holatni so'rash oralig'i. Kam so'rov Resolume'ni qiynamaydi. */
+        private const val POLL_MS = 3000L
+
+        /** Nomlar har shuncha so'rovda bir marta yangilanadi. */
+        private const val NAME_EVERY = 10
+
+        /** Miniatura so'rovlari orasidagi pauza. */
+        private const val THUMB_GAP_MS = 300L
+
+        /** Miniatura xatosidan keyin qayta urinish oralig'i. */
         private const val THUMB_RETRY_MS = 15_000L
+
+        /** Qidiruv chegarasi (Arena odatda bundan kam ishlatadi). */
+        private const val MAX_LAYERS = 16
+        private const val MAX_COLUMNS = 40
     }
 }

@@ -43,6 +43,10 @@ class ArenaSnapshot(
     private val layerNames: Map<Int, String>,
     private val clips: Map<Pair<Int, Int>, ClipInfo>,
     private val columns: Map<Int, ColumnInfo>,
+    /** Resolume'dagi haqiqiy qatlamlar soni (0 = noma'lum). */
+    val layerCount: Int = 0,
+    /** Resolume'dagi haqiqiy kolonkalar soni (0 = noma'lum). */
+    val columnCount: Int = 0,
 ) {
     fun clip(layer: Int, column: Int): ClipInfo? = clips[layer to column]
 

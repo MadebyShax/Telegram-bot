@@ -117,6 +117,11 @@ private fun Screen.layerLabel(layer: Int): String =
 private fun Screen.columnLabel(column: Int): String =
     snapshot.columnName(column)?.let { "${t("column")} $column\n$it" } ?: "${t("column")} $column"
 
+/** Haqiqiy qatlam/kolonka soni. Noma'lum bo'lsa standart layout o'lchami. */
+private fun Screen.layerTotal(): Int = snapshot.layerCount.takeIf { it > 0 } ?: LAYERS
+
+private fun Screen.columnTotal(): Int = snapshot.columnCount.takeIf { it > 0 } ?: COLUMNS
+
 private fun stateText(state: ClipState?): String = when (state) {
     ClipState.CONNECTED -> t("connected")
     ClipState.PREVIEW -> t("preview")
@@ -180,7 +185,7 @@ private class ClipCell(ctx: Context, private val baseColor: Int) {
 fun Screen.clipsPage(): View = page {
     place(ctx.button(t("stopAll"), Palette.STOP) { client.run(ArenaCommands.stopAll()) })
 
-    val columnButtons = (1..COLUMNS).map { column ->
+    val columnButtons = (1..columnTotal()).map { column ->
         ctx.button(columnLabel(column)) {
             client.run(ArenaCommands.triggerColumn(column))
         }.also { button ->
@@ -194,7 +199,7 @@ fun Screen.clipsPage(): View = page {
     }
     place(gridRow(columnButtons))
 
-    for (layer in 1..LAYERS) {
+    for (layer in 1..layerTotal()) {
         val color = Palette.LAYER[(layer - 1) % Palette.LAYER.size]
         val layerButton = ctx.button(layerLabel(layer), color) {
             sel.layer = layer
@@ -203,7 +208,7 @@ fun Screen.clipsPage(): View = page {
         listeners += { layerButton.text = layerLabel(layer) }
 
         val cells = mutableListOf<View>(layerButton)
-        for (column in 1..COLUMNS) {
+        for (column in 1..columnTotal()) {
             val cell = ClipCell(ctx, Palette.dim(color))
             cell.view.setOnClickListener {
                 sel.layer = layer
@@ -236,7 +241,7 @@ fun Screen.layerPage(): View = page {
     refreshCaption()
     listeners += { refreshCaption() }
 
-    place(ctx.stepper(t("layer"), sel.layer, 1, LAYERS) {
+    place(ctx.stepper(t("layer"), sel.layer, 1, layerTotal()) {
         sel.layer = it
         refreshCaption()
     })
@@ -288,11 +293,11 @@ fun Screen.clipPage(): View = page {
     refreshCaption()
     listeners += { refreshCaption() }
 
-    place(ctx.stepper(t("layer"), sel.layer, 1, LAYERS) {
+    place(ctx.stepper(t("layer"), sel.layer, 1, layerTotal()) {
         sel.layer = it
         refreshCaption()
     })
-    place(ctx.stepper(t("column"), sel.column, 1, COLUMNS) {
+    place(ctx.stepper(t("column"), sel.column, 1, columnTotal()) {
         sel.column = it
         refreshCaption()
     })
@@ -469,6 +474,12 @@ fun Screen.settingsPage(): View = page {
     place(portField)
     place(webPortField)
     place(lastField)
+    val thumbs = ctx.button(thumbLabel(settings.thumbnails)) {}
+    thumbs.setOnClickListener {
+        settings.thumbnails = !settings.thumbnails
+        thumbs.text = thumbLabel(settings.thumbnails)
+    }
+    place(thumbs)
     place(
         ctx.button(t("save"), Palette.TAP) {
             settings.host = hostField.text.toString().trim()
@@ -483,3 +494,5 @@ fun Screen.settingsPage(): View = page {
     )
     place(saved)
 }
+
+private fun thumbLabel(on: Boolean): String = "${t("thumbs")}: ${if (on) t("on") else t("off")}"

@@ -73,6 +73,9 @@ object Texts {
         "refresh" to "⟳ Yangilash",
         "webPort" to "Web API port",
         "lastAction" to "So'nggi",
+        "thumbs" to "Miniaturalar",
+        "on" to "yoqilgan",
+        "off" to "o'chirilgan",
     )
 
     private val ru = mapOf(
@@ -138,6 +141,9 @@ object Texts {
         "refresh" to "⟳ Обновить",
         "webPort" to "Порт Web API",
         "lastAction" to "Последнее",
+        "thumbs" to "Миниатюры",
+        "on" to "вкл",
+        "off" to "выкл",
     )
 
     fun get(key: String): String {
